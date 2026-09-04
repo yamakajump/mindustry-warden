@@ -194,7 +194,18 @@ public class WardenDialog extends BaseDialog {
                 + (Vars.state.rules.winWave > 0 ? "/" + Vars.state.rules.winWave : ""),
                 "capture.wave", false);
             card(cards, Vars.state.enemies, "capture.enemies", Vars.state.enemies > 0);
+
+            mindustry.type.Sector sector = Vars.state.rules.sector;
+            if (sector != null) {
+                card(cards, Lang.get(sector.isCaptured() ? "capture.captured" : "capture.open"),
+                    "capture.state", false);
+            }
         }).padBottom(12f).row();
+
+        mindustry.type.Sector current = Vars.state.rules.sector;
+        if (current != null && current.isCaptured()) {
+            body.add(Lang.get("capture.already")).color(Pal.lightishGray).wrap().width(520f).row();
+        }
 
         body.button(Lang.get("capture.do"), Icon.modeAttack, Styles.defaultt, Vars.iconLarge, () -> {
             SectorCapture.Result result = capture.run();
@@ -253,6 +264,8 @@ public class WardenDialog extends BaseDialog {
                     int cleared = basePlans.clearBlockers(clearOwn);
                     Vars.ui.showInfoFade(Lang.get("recover.cleared", cleared), 4f);
                 }).tooltip(Lang.get("recover.clear.hint"));
+
+            steps.row();
 
             steps.button(Lang.get("recover.place.do"), Icon.wrench, Styles.defaultt,
                 Vars.iconMed, () -> {
@@ -347,6 +360,13 @@ public class WardenDialog extends BaseDialog {
     private void buildUnits(Table body) {
         title(body, "tab.units");
 
+        Team mine = Vars.player.team();
+        body.table(cards -> {
+            cards.left();
+            card(cards, spawner.alive(mine), "units.alive", false);
+            card(cards, spawner.cap(mine), "units.cap", false);
+        }).padBottom(10f).row();
+
         if (unitType == null) {
             unitType = spawner.types().first();
         }
@@ -386,7 +406,11 @@ public class WardenDialog extends BaseDialog {
                     .with(button -> button.getStyle().imageUpColor = team.color);
             }
 
-            row.add(Lang.get("units.count")).color(Pal.lightishGray).padLeft(24f).padRight(10f);
+        }).padBottom(4f).row();
+
+        body.table(row -> {
+            row.left();
+            row.add(Lang.get("units.count")).color(Pal.lightishGray).padRight(10f);
             for (int count : new int[]{1, 5, 10, 25}) {
                 int value = count;
                 row.button(String.valueOf(count), Styles.togglet, () -> {
@@ -396,12 +420,25 @@ public class WardenDialog extends BaseDialog {
             }
         }).padBottom(12f).row();
 
-        body.button(Lang.get("units.spawn"), Icon.add, Styles.defaultt, Vars.iconLarge, () -> {
-            int spawned = spawner.spawn(unitType, unitTeam, unitCount);
-            Vars.ui.showInfoFade(spawned < unitCount
-                ? Lang.get("units.capped", spawned, unitCount)
-                : Lang.get("units.spawned", spawned + " " + unitType.localizedName), 4f);
-        }).size(mainButton, 70f).row();
+        body.table(actions -> {
+            actions.left();
+            actions.button(Lang.get("units.spawn"), Icon.add, Styles.defaultt, Vars.iconLarge, () -> {
+                int spawned = spawner.spawn(unitType, unitTeam, unitCount);
+                rebuild();
+                Vars.ui.showInfoFade(spawned < unitCount
+                    ? Lang.get("units.capped", spawned, unitCount)
+                    : Lang.get("units.spawned", spawned + " " + unitType.localizedName), 4f);
+            }).size(mainButton * 0.6f, 70f).pad(3f);
+
+            // "As many as the game will take", which is what a cap is for.
+            actions.button(Lang.get("units.fill"), Icon.units, Styles.defaultt, Vars.iconMed, () -> {
+                int room = Math.max(0, spawner.cap(unitTeam) - spawner.alive(unitTeam));
+                int spawned = spawner.spawn(unitType, unitTeam, room);
+                rebuild();
+                Vars.ui.showInfoFade(
+                    Lang.get("units.spawned", spawned + " " + unitType.localizedName), 4f);
+            }).size(mainButton * 0.62f, 70f).pad(3f);
+        }).row();
     }
 
     private void buildSupplies(Table body) {
@@ -552,7 +589,8 @@ public class WardenDialog extends BaseDialog {
 
         body.table(rates -> {
             rates.left();
-            rates.add(Lang.get("speed.build")).color(Pal.lightishGray).width(160f);
+            rates.add(Lang.get("speed.build")).color(Pal.lightishGray).width(160f)
+                .tooltip(Lang.get("speed.build.hint"));
             for (float step : UnitTuning.steps) {
                 float value = step;
                 rates.button(label(step), Styles.togglet, () -> {
@@ -564,7 +602,8 @@ public class WardenDialog extends BaseDialog {
 
         body.table(rates -> {
             rates.left();
-            rates.add(Lang.get("speed.mine")).color(Pal.lightishGray).width(160f);
+            rates.add(Lang.get("speed.mine")).color(Pal.lightishGray).width(160f)
+                .tooltip(Lang.get("speed.mine.hint"));
             for (float step : UnitTuning.steps) {
                 float value = step;
                 rates.button(label(step), Styles.togglet, () -> {

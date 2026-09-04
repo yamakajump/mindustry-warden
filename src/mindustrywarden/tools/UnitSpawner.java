@@ -34,6 +34,16 @@ public final class UnitSpawner {
         return teams;
     }
 
+    /** How many units this team may hold, which is what "as many as possible" means. */
+    public int cap(Team team) {
+        return mindustry.entities.Units.getCap(team);
+    }
+
+    /** How many it holds now. */
+    public int alive(Team team) {
+        return team.data().units.size;
+    }
+
     /**
      * Spawn {@code count} units and return how many the game accepted.
      *

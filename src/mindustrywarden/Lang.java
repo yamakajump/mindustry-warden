@@ -42,6 +42,11 @@ public final class Lang {
         put("capture.mode.attack", "attack", "attaque");
         put("capture.mode.waves", "waves", "vagues");
         put("capture.do", "Capture the sector", "Capturer le secteur");
+        put("capture.state", "state", "état");
+        put("capture.captured", "captured", "capturé");
+        put("capture.open", "not yours", "pas à toi");
+        put("capture.already", "This sector is already yours.",
+            "Ce secteur est déjà à toi.");
         put("capture.hint",
             "Removes every enemy building and unit, then lets the game declare the win.",
             "Supprime tous les bâtiments et unités ennemis, puis laisse le jeu déclarer la victoire.");
@@ -114,6 +119,9 @@ public final class Lang {
 
         put("units.team", "Team", "Équipe");
         put("units.count", "Count", "Nombre");
+        put("units.cap", "unit cap", "limite");
+        put("units.alive", "alive", "en vie");
+        put("units.fill", "Fill to the cap", "Remplir jusqu'à la limite");
         put("units.spawn", "Spawn", "Faire apparaître");
         put("units.spawned", "@ spawned.", "@ apparus.");
         put("units.capped", "@ of @ spawned, unit cap reached.",
@@ -150,12 +158,20 @@ public final class Lang {
         put("speed.you.hint", "Yours alone. Does not touch the game clock.",
             "La tienne seulement. Ne touche pas à l'horloge du jeu.");
         put("speed.team", "Whole team", "Toute l'équipe");
-        put("speed.build", "Build", "Construction");
-        put("speed.mine", "Mine", "Minage");
-        put("speed.invulnerable", "Invulnerable", "Invincible");
+        put("speed.build", "Building", "Construction");
+        put("speed.build.hint",
+            "How fast your units place blocks. Does nothing while nothing is being built.",
+            "Vitesse à laquelle tes unités posent les blocs. Sans effet si rien n'est en construction.");
+        put("speed.mine", "Mining", "Minage");
+        put("speed.mine.hint",
+            "How fast your units pull ore out of the ground by hand.",
+            "Vitesse à laquelle tes unités extraient le minerai à la main.");
+        put("speed.invulnerable", "Nothing can destroy my blocks", "Rien ne peut détruire mes blocs");
         put("speed.invulnerable.hint",
-            "Your blocks and units. Written into the save, turn it off before you stop.",
-            "Tes blocs et unités. Écrit dans la sauvegarde, coupe-le avant d'arrêter.");
+            "Your blocks and units survive anything: fire, waves, a griefed reactor. It is "
+                + "a team rule, so it is written into the save. Turn it off before you stop.",
+            "Tes blocs et unités survivent à tout : le feu, les vagues, un réacteur saboté. "
+                + "C'est une règle d'équipe, donc écrite dans la sauvegarde. Coupe-le avant d'arrêter.");
 
         put("settings.language", "Language", "Langue");
         put("settings.key", "Panel key", "Touche du panneau");

@@ -129,6 +129,18 @@ final class WardenSelfTest {
             Vars.logic.update();
         }
 
+        // Build and mine rates, which a player reported as doing nothing: the check is
+        // that the game's own accessor reflects what the panel wrote.
+        tuning.buildSpeed(4f);
+        tuning.mineSpeed(8f);
+        check("build speed reaches the game (" + Vars.state.rules.buildSpeed(Team.sharded) + ")",
+            Vars.state.rules.buildSpeed(Team.sharded) == 4f);
+        check("mine speed reaches the game (" + Vars.state.rules.unitMineSpeed(Team.sharded) + ")",
+            Vars.state.rules.unitMineSpeed(Team.sharded) == 8f);
+        check("and the panel reads them back", tuning.buildSpeed() == 4f && tuning.mineSpeed() == 8f);
+        tuning.buildSpeed(1f);
+        tuning.mineSpeed(1f);
+
         // Fast forward, and above all that it comes back.
         speed.multiplier(64f);
         long start = System.nanoTime();
