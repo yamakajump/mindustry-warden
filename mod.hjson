@@ -1,0 +1,11 @@
+name: mindustry-warden
+displayName: "Warden"
+author: yamakajump
+main: mindustrywarden.WardenMod
+description: "Host and sandbox tools: capture a sector, spawn units, fill the core, change game speed."
+version: "0.1.0"
+minGameVersion: 154
+# Hidden from the multiplayer mod comparison on purpose. Warden touches nothing a remote
+# server simulates, but a visible mod is enough for a server to refuse the player with
+# "incompatible mods", which would punish carrying a tool that cannot affect that server.
+hidden: true
