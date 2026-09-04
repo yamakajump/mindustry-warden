@@ -104,7 +104,7 @@ public class WardenDialog extends BaseDialog {
         if (!HostGuard.allowed()) {
             cont.table(Tex.pane, warning -> {
                 warning.image(Icon.warning).color(Pal.remove).size(Vars.iconLarge).padRight(10f);
-                warning.add(HostGuard.refusal()).wrap().width(panelWidth - 90f).color(Pal.lightishGray);
+                warning.add(HostGuard.refusal()).wrap().width(panelWidth - 120f).color(Pal.lightishGray);
             }).width(panelWidth).pad(10f).row();
             return;
         }
@@ -131,7 +131,7 @@ public class WardenDialog extends BaseDialog {
     }
 
     private static void note(Table table, String text) {
-        table.add(text).wrap().width(panelWidth - 24f).color(Pal.lightishGray).padBottom(8f).row();
+        table.add(text).wrap().width(panelWidth - 60f).color(Pal.lightishGray).padBottom(8f).row();
     }
 
     private void buildCapture(Table body) {
@@ -150,7 +150,7 @@ public class WardenDialog extends BaseDialog {
                 .update(label -> label.setColor(Vars.state.enemies > 0 ? Pal.remove : Pal.heal)).row();
         }).width(panelWidth - 24f).pad(6f).row();
 
-        note(body, "Removes every enemy building and unit, holds the wave timer back, and\n"
+        note(body, "Removes every enemy building and unit, holds the wave timer back, and "
             + "lets the game declare the capture itself on the next tick.");
 
         body.button("Capture", Icon.modeAttack, Styles.defaultt, Vars.iconMed, () -> {
@@ -184,11 +184,12 @@ public class WardenDialog extends BaseDialog {
                 .row();
         }).width(panelWidth - 24f).pad(6f).row();
 
-        note(body, "The game files every building of yours that dies, with its position and\n"
-            + "its configuration, and keeps the list in the save. Clear what was built on\n"
-            + "top of them first: a plan under an occupied tile queues fine and then never\n"
-            + "builds. The starter base the game drops when you launch counts as covering,\n"
-            + "which is what the second option is for. Cores are never removed.");
+        note(body, "The game files every building of yours that dies, with its position and "
+            + "its configuration, and keeps the list in the save. Clear what was built "
+            + "on top of them first: a plan under an occupied tile queues fine and then "
+            + "never builds. The starter base the game drops when you launch counts as "
+            + "covering, which is what the second option is for. Cores are never "
+            + "removed.");
 
         body.button("1. Clear what covers them", Icon.eraser, Styles.defaultt, Vars.iconMed, () -> {
             int cleared = basePlans.clearBlockers(clearOwn);
@@ -203,7 +204,7 @@ public class WardenDialog extends BaseDialog {
         body.button("2. Put the whole base back now", Icon.wrench, Styles.defaultt, Vars.iconMed, () -> {
             int placed = basePlans.placeAll();
             if (placed == 0) {
-                Vars.ui.showInfo("Nothing to rebuild: the game remembers no destroyed block\n"
+                Vars.ui.showInfo("Nothing to rebuild: the game remembers no destroyed block "
                     + "for your team on this map.");
                 return;
             }
@@ -214,20 +215,20 @@ public class WardenDialog extends BaseDialog {
         body.button("Or queue it for your builders", Icon.hammer, Styles.defaultt, Vars.iconMed, () -> {
             int queued = basePlans.queueAll();
             if (queued == 0) {
-                Vars.ui.showInfo("Nothing to rebuild: the game remembers no destroyed block\n"
+                Vars.ui.showInfo("Nothing to rebuild: the game remembers no destroyed block "
                     + "for your team on this map.");
                 return;
             }
             hide();
-            Vars.ui.showInfoFade(queued + " blocks queued. They cost resources and wait for a\n"
-                + "builder in range, so expect this to take a while.", 6f);
+            Vars.ui.showInfoFade(queued + " blocks queued. They cost resources and wait "
+                + "for a builder in range, so expect this to take a while.", 6f);
         }).size(320f, 54f).padBottom(16f).row();
 
         header(body, "Take it somewhere else");
 
-        note(body, "Saves the same plans as schematics, cut into pieces the game will accept,\n"
-            + "so the base can be rebuilt on another sector entirely. Logic processor links\n"
-            + "keep their old absolute positions and will need redoing.");
+        note(body, "Saves the same plans as schematics, cut into pieces the game will accept, "
+            + "so the base can be rebuilt on another sector entirely. Logic processor "
+            + "links keep their old absolute positions and will need redoing.");
 
         body.button("Export to schematics", Icon.copy, Styles.defaultt, Vars.iconMed, () -> {
             var saved = basePlans.export("Recovered base");
@@ -371,7 +372,7 @@ public class WardenDialog extends BaseDialog {
 
         header(body, "Research");
 
-        note(body, "Unlocking is stored on your profile, not in this save: it stays unlocked\n"
+        note(body, "Unlocking is stored on your profile, not in this save: it stays unlocked "
             + "in every campaign afterwards, and there is no undo.");
 
         body.button("Unlock all research", Icon.tree, Styles.defaultt, Vars.iconMed, () ->
@@ -404,11 +405,11 @@ public class WardenDialog extends BaseDialog {
                 .update(label -> label.setColor(speed.throttled() ? Pal.accent : Pal.lightishGray)).row();
         }).width(panelWidth - 24f).pad(6f).row();
 
-        note(body, "Everything moves: units, conveyors, waves, you. Above 1x the world runs\n"
-            + "several times per frame rather than in bigger steps, so the simulation stays\n"
-            + "exact. The number is a ceiling, not a promise: extra ticks only get a few\n"
-            + "milliseconds per frame, so a big base will run below what you asked rather\n"
-            + "than freeze. Fast forward also pauses while this panel is open.");
+        note(body, "Everything moves: units, conveyors, waves, you. Above 1x the world runs "
+            + "several times per frame rather than in bigger steps, so the simulation "
+            + "stays exact. The number is a ceiling, not a promise: extra ticks only get "
+            + "a few milliseconds per frame, so a big base will run below what you asked "
+            + "rather than freeze. Fast forward also pauses while this panel is open.");
 
         header(body, "Your movement speed");
 
@@ -453,7 +454,7 @@ public class WardenDialog extends BaseDialog {
 
         header(body, "Invulnerability");
 
-        note(body, "A team rule, so it travels with the save. Turn it off before you put the\n"
+        note(body, "A team rule, so it travels with the save. Turn it off before you put the "
             + "game away.");
 
         body.check("Blocks and units of your team", invulnerability.enabled(), on -> {
