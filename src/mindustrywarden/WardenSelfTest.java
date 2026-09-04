@@ -195,6 +195,24 @@ final class WardenSelfTest {
         check("and it is listed", !snapshots.list().isEmpty());
         check("its age reads as recent", snapshots.minutesOld(snapshots.list().first()) == 0);
 
+        // Language detection, which decides what the room speaks and therefore what
+        // every outgoing line is translated into. Samples taken from a real server's chat.
+        var guess = new mindustrywarden.tools.LanguageGuess();
+        check("russian (" + guess.of("они все в нулевые корды летят") + ")",
+            "ru".equals(guess.of("они все в нулевые корды летят")));
+        check("ukrainian (" + guess.of("це не працює правильно їх") + ")",
+            "uk".equals(guess.of("це не працює правильно їх")));
+        check("chinese (" + guess.of("我翻译一下有点听不懂") + ")",
+            "zh-CN".equals(guess.of("我翻译一下有点听不懂")));
+        check("japanese (" + guess.of("これはテストですね") + ")",
+            "ja".equals(guess.of("これはテストですね")));
+        check("french (" + guess.of("je vais faire la base avec toi") + ")",
+            "fr".equals(guess.of("je vais faire la base avec toi")));
+        check("english (" + guess.of("i try to creat the big exporting base") + ")",
+            "en".equals(guess.of("i try to creat the big exporting base")));
+        check("noise is not a language", guess.of("gg") == null && guess.of(":)") == null);
+        check("the table is not empty", guess.knownLanguages() > 10);
+
         // The translator, which is the one tool here that depends on something outside
         // the machine. A failure prints rather than fails the run: no network is a fair
         // reason for this check not to answer, and it must not block the rest.

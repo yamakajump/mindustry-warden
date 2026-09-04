@@ -174,26 +174,29 @@ public final class Lang {
             "Tes blocs et unités survivent à tout : le feu, les vagues, un réacteur saboté. "
                 + "C'est une règle d'équipe, donc écrite dans la sauvegarde. Coupe-le avant d'arrêter.");
 
-        put("chat.read", "Translate what I read", "Traduire ce que je lis");
-        put("chat.read.hint",
-            "Every incoming line is printed again underneath, in your language. The "
-                + "original stays: a translation is a guess, and you should be able to "
-                + "check it.",
-            "Chaque message reçu est réaffiché en dessous, dans ta langue. L'original "
-                + "reste : une traduction est une supposition, tu dois pouvoir la vérifier.");
-        put("chat.write", "Translate what I write", "Traduire ce que j'écris");
-        put("chat.write.hint",
-            "Your message is sent a second time, translated. The game gives no way to "
-                + "catch a line on its way out, so it is that or nothing.",
-            "Ton message est renvoyé une seconde fois, traduit. Le jeu ne permet pas "
-                + "d'intercepter un message avant l'envoi, donc c'est ça ou rien.");
-        put("chat.into", "I read in", "Je lis en");
-        put("chat.out", "They read in", "Ils lisent en");
+        put("chat.on", "Translate the chat", "Traduire le chat");
+        put("chat.on.hint",
+            "Incoming lines are shown again in your language, and yours are sent a second "
+                + "time in the room's. Nothing to configure: the room's language is worked "
+                + "out from what is said in it.",
+            "Les messages reçus sont réaffichés dans ta langue, et les tiens renvoyés dans "
+                + "celle de la salle. Rien à régler : la langue de la salle est déduite de "
+                + "ce qui s'y dit.");
+        put("chat.mine", "you", "toi");
+        put("chat.room", "the room", "la salle");
+        put("chat.listening", "listening", "à l'écoute");
+        put("chat.state.known", "@ of the last @ lines are in @",
+            "@ des @ derniers messages sont en @");
+        put("chat.state.unknown", "Not enough has been said yet to tell.",
+            "Pas encore assez de messages pour le dire.");
+        put("chat.forced", "Force a language", "Forcer une langue");
+        put("chat.auto", "Auto", "Auto");
+        put("chat.forget", "Forget what was heard", "Oublier ce qui a été entendu");
         put("chat.privacy",
-            "Chat lines are sent to Google to be translated. Nothing else leaves your "
-                + "machine, and nothing is sent while both switches are off.",
-            "Les messages sont envoyés à Google pour être traduits. Rien d'autre ne quitte "
-                + "ta machine, et rien n'est envoyé si les deux interrupteurs sont éteints.");
+            "Detection happens on your machine. Only the lines being translated are sent "
+                + "to a translation service, and nothing is sent while this is off.",
+            "La détection se fait sur ta machine. Seuls les messages traduits sont envoyés "
+                + "à un service de traduction, et rien n'est envoyé si c'est éteint.");
         put("settings.language", "Language", "Langue");
         put("settings.key", "Panel key", "Touche du panneau");
         put("settings.key.value", "Right shift", "Maj droite");

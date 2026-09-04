@@ -34,14 +34,60 @@ public final class Translator {
      * line shown as it came, which is what would have happened anyway.
      */
     public void translate(String text, String target, Cons<String> done) {
-        String url = endpoint + target + "&q=" + URLEncoder.encode(text, StandardCharsets.UTF_8);
+        translate(text, null, target, done);
+    }
+
+    /**
+     * Translate {@code text} into {@code target}, then hand the result to {@code done}.
+     *
+     * <p>Two services, in order. Google first, because it detects the source itself and
+     * reads chat shorthand better. MyMemory second, because Google answers a script with
+     * a "Sorry" page rather than a translation and may one day answer the game with one
+     * too. The fallback needs to be told the source language, which is why {@code source}
+     * is carried this far: it is the guess the room count was built from anyway.
+     *
+     * <p>Never called back on failure. A line that cannot be translated is shown as it
+     * came, which is what would have happened without the mod.
+     */
+    public void translate(String text, String source, String target, Cons<String> done) {
+        String encoded = URLEncoder.encode(text, StandardCharsets.UTF_8);
+
+        Http.get(endpoint + target + "&q=" + encoded, response -> {
+            String translated = parse(response.getResultAsString());
+            if (usable(translated, text)) {
+                done.get(translated);
+            } else {
+                fallback(encoded, source, target, text, done);
+            }
+        }, error -> fallback(encoded, source, target, text, done));
+    }
+
+    /** MyMemory, which answers plain JSON and does not mind being called by a program. */
+    private void fallback(String encoded, String source, String target, String original,
+        Cons<String> done) {
+
+        String from = source == null || source.isEmpty() ? "en" : source;
+        String url = "https://api.mymemory.translated.net/get?q=" + encoded
+            + "&langpair=" + from + "|" + target;
 
         Http.get(url, response -> {
-            String translated = parse(response.getResultAsString());
-            if (translated != null && !translated.isEmpty() && !translated.equalsIgnoreCase(text)) {
-                done.get(translated);
+            try {
+                String translated = Jval.read(response.getResultAsString())
+                    .get("responseData").get("translatedText").asString();
+                if (usable(translated, original)) {
+                    done.get(translated);
+                }
+            } catch (Throwable malformed) {
+                Log.debug("[warden] unreadable fallback reply");
             }
         }, error -> Log.debug("[warden] translation failed: @", error.getMessage()));
+    }
+
+    /** A translation worth showing: present, and not the line we already have. */
+    private static boolean usable(String translated, String original) {
+        return translated != null && !translated.isEmpty()
+            && !translated.equalsIgnoreCase(original)
+            && !translated.contains("INVALID SOURCE LANGUAGE");
     }
 
     /**

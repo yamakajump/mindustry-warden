@@ -711,46 +711,54 @@ public class WardenDialog extends BaseDialog {
     private void buildChat(Table body) {
         title(body, "tab.chat");
 
-        body.check(Lang.get("chat.read"), chat.reading(), chat::reading)
-            .left().tooltip(Lang.get("chat.read.hint")).padBottom(6f).row();
+        String room = chat.roomLanguage();
+
+        body.table(cards -> {
+            cards.left();
+            card(cards, chat.mine(), "chat.mine", false);
+            card(cards, room == null ? Lang.get("chat.listening") : room, "chat.room", false);
+        }).padBottom(10f).row();
+
+        body.add(room == null
+            ? Lang.get("chat.state.unknown")
+            : Lang.get("chat.state.known", chat.agreeing(), chat.heardCount(), room))
+            .color(Pal.lightishGray).wrap().width(contentWidth).padBottom(10f).row();
+
+        body.check(Lang.get("chat.on"), chat.enabled(), on -> {
+            chat.enabled(on);
+            rebuild();
+        }).left().tooltip(Lang.get("chat.on.hint")).padBottom(14f).row();
+
+        body.add(Lang.get("chat.forced")).color(Pal.lightishGray).left().padBottom(4f).row();
 
         body.table(row -> {
             row.left();
-            row.add(Lang.get("chat.into")).color(Pal.lightishGray)
-                .width(Math.min(160f, contentWidth * 0.3f));
-            languages(row, chat.into(), chat::into);
-        }).padBottom(14f).row();
+            int index = 0;
 
-        body.check(Lang.get("chat.write"), chat.writing(), chat::writing)
-            .left().tooltip(Lang.get("chat.write.hint")).padBottom(6f).row();
+            row.button(Lang.get("chat.auto"), Styles.togglet, () -> {
+                chat.forced("");
+                rebuild();
+            }).checked(button -> chat.forced().isEmpty()).size(88f, 44f).pad(2f);
 
-        body.table(row -> {
-            row.left();
-            row.add(Lang.get("chat.out")).color(Pal.lightishGray)
-                .width(Math.min(160f, contentWidth * 0.3f));
-            languages(row, chat.out(), chat::out);
-        }).padBottom(14f).row();
+            for (String code : Translator.languages) {
+                row.button(code.length() > 2 ? code.substring(0, 2) : code, Styles.togglet, () -> {
+                    chat.forced(code);
+                    rebuild();
+                }).checked(button -> chat.forced().equals(code)).size(78f, 44f).pad(2f);
+
+                if (++index % Math.max(1, fit(82f) - 1) == 0) {
+                    row.row();
+                }
+            }
+        }).padBottom(10f).row();
+
+        body.button(Lang.get("chat.forget"), Icon.refresh, Styles.defaultt, Vars.iconMed, () -> {
+            chat.forget();
+            rebuild();
+        }).size(Math.min(320f, contentWidth), 50f).padBottom(12f).row();
 
         body.add(Lang.get("chat.privacy")).color(Pal.lightishGray).wrap()
             .width(contentWidth).row();
-    }
-
-    /** The language buttons, shared by both directions of the chat. */
-    private void languages(Table table, String current, arc.func.Cons<String> pick) {
-        int index = 0;
-        for (String code : Translator.languages) {
-            // The button shows "zh", the request still asks for "zh-CN": the full code
-            // does not fit and comes out broken across two lines.
-            table.button(code.length() > 2 ? code.substring(0, 2) : code, Styles.togglet, () -> {
-                pick.get(code);
-                rebuild();
-            }).checked(button -> current.equals(code)).size(78f, 44f).pad(2f);
-
-            if (++index % Math.max(1, fit(82f) - 2) == 0) {
-                table.row();
-                table.add("").width(Math.min(160f, contentWidth * 0.3f));
-            }
-        }
     }
 
     private void buildSettings(Table body) {
