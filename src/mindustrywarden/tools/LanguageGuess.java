@@ -50,16 +50,19 @@ public final class LanguageGuess {
         }
 
         String clean = text.trim();
-        if (clean.length() < shortest) {
+        if (clean.isEmpty()) {
             return null;
         }
 
+        // The alphabet answers whatever the length: "хз" is two letters and unmistakably
+        // Russian. The length rule exists for the Latin alphabet alone, where "ok" and
+        // "gg" belong to no language and would otherwise be counted as English.
         String script = byScript(clean);
         if (script != null) {
             return script;
         }
 
-        return byWords(clean);
+        return clean.length() < shortest ? null : byWords(clean);
     }
 
     /**

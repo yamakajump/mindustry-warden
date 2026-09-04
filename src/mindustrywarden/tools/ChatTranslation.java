@@ -5,6 +5,7 @@ import arc.Events;
 import arc.struct.ObjectIntMap;
 import arc.struct.ObjectSet;
 import arc.struct.Seq;
+import arc.util.Log;
 import mindustry.Vars;
 import mindustry.game.EventType.PlayerChatEvent;
 import mindustry.gen.Call;
@@ -28,6 +29,14 @@ import mindustry.gen.Call;
  * not merely listened to.
  */
 public final class ChatTranslation {
+    /**
+     * What separates a line from its translation, and marks it as already done.
+     *
+     * <p>Plain text on purpose. A colour tag here would be handed to the translator on
+     * any second pass and come back as a translated tag.
+     */
+    private static final String marker = " | ";
+
     private static final String enabledSetting = "warden-chat-on";
     private static final String forcedSetting = "warden-chat-forced";
 
@@ -73,6 +82,13 @@ public final class ChatTranslation {
         }
 
         watcher.poll((index, line) -> {
+            // A line we already rewrote, whatever brought it back around. Without this
+            // the marker itself gets translated, and "[lightgray]" comes back as
+            // "[blanc]" in the middle of the chat.
+            if (line.contains(marker)) {
+                return;
+            }
+
             String text = spoken(line);
             if (text == null || handled.contains(line)) {
                 return;
@@ -81,15 +97,27 @@ public final class ChatTranslation {
             String language = guess.of(text);
             remember(language);
 
-            if (!enabled() || language == null || language.equals(mine())) {
+            if (!enabled()) {
+                return;
+            }
+            if (language == null) {
+                Log.info("[warden] no language for: @", text);
+                return;
+            }
+            if (language.equals(mine())) {
                 return;
             }
 
             handled.add(line);
+            Log.info("[warden] @ -> @: @", language, mine(), text);
+
             translator.translate(text, language, mine(), translated -> Core.app.post(() -> {
-                String rewritten = line + " [lightgray]| " + translated;
+                Log.info("[warden] got: @", translated);
+                String rewritten = line + marker + translated;
                 if (watcher.replace(line, rewritten)) {
                     handled.add(rewritten);
+                } else {
+                    Log.info("[warden] line vanished before it could be rewritten");
                 }
             }));
         });
@@ -112,8 +140,33 @@ public final class ChatTranslation {
         if (mark < 0 || mark + 2 >= line.length()) {
             return null;
         }
-        String text = line.substring(mark + 2).trim();
+        // Colour tags stripped before anything is sent: a translator handed
+        // "[lightgray]" translates it, and the word lands in the middle of the chat.
+        String text = withoutTags(line.substring(mark + 2)).trim();
         return text.isEmpty() ? null : text;
+    }
+
+    /**
+     * Drop every {@code [tag]} from a piece of text.
+     *
+     * <p>Written by hand rather than with a regular expression: the pattern for it is
+     * four escaped brackets deep, and this reads as what it does.
+     */
+    private static String withoutTags(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        boolean inside = false;
+
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '[') {
+                inside = true;
+            } else if (c == ']') {
+                inside = false;
+            } else if (!inside) {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     private void remember(String language) {

@@ -214,6 +214,16 @@ final class WardenSelfTest {
             "fr".equals(guess.of("je vais faire la base avec toi")));
         check("english (" + guess.of("i try to creat the big exporting base") + ")",
             "en".equals(guess.of("i try to creat the big exporting base")));
+        // Short lines, which a Russian server is mostly made of and which the first
+        // version skipped entirely: the length rule now applies to the Latin alphabet
+        // alone, where it is needed to keep "ok" and "gg" out.
+        check("two cyrillic letters (" + guess.of("хз") + ")", "ru".equals(guess.of("хз")));
+        check("one short word (" + guess.of("демон") + ")", "ru".equals(guess.of("демон")));
+        check("a tagged line loses its tags ("
+            + mindustrywarden.tools.ChatTranslation.spoken("[coral][X][]: [white]привет") + ")",
+            "привет".equals(
+                mindustrywarden.tools.ChatTranslation.spoken("[coral][X][]: [white]привет")));
+
         check("noise is not a language", guess.of("gg") == null && guess.of(":)") == null);
         check("the table is not empty", guess.knownLanguages() > 10);
 

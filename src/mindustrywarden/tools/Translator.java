@@ -57,9 +57,13 @@ public final class Translator {
             if (usable(translated, text)) {
                 done.get(translated);
             } else {
+                Log.info("[warden] google gave nothing usable, trying the fallback");
                 fallback(encoded, source, target, text, done);
             }
-        }, error -> fallback(encoded, source, target, text, done));
+        }, error -> {
+            Log.info("[warden] google refused (@), trying the fallback", error.getMessage());
+            fallback(encoded, source, target, text, done);
+        });
     }
 
     /** MyMemory, which answers plain JSON and does not mind being called by a program. */
@@ -77,10 +81,13 @@ public final class Translator {
                 if (usable(translated, original)) {
                     done.get(translated);
                 }
+                if (!usable(translated, original)) {
+                    Log.info("[warden] fallback gave nothing usable: @", translated);
+                }
             } catch (Throwable malformed) {
-                Log.debug("[warden] unreadable fallback reply");
+                Log.info("[warden] unreadable fallback reply");
             }
-        }, error -> Log.debug("[warden] translation failed: @", error.getMessage()));
+        }, error -> Log.info("[warden] both services failed: @", error.getMessage()));
     }
 
     /** A translation worth showing: present, and not the line we already have. */
