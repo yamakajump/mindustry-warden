@@ -161,6 +161,7 @@ final class WardenSelfTest {
         Rubble rubble = new Rubble();
         check("rubble is counted (" + rubble.count() + ")", rubble.count() > 0);
         check("rubble is removed", rubble.clear() > 0 && rubble.count() == 0);
+        check("putting out fires is harmless with none", rubble.extinguish() == 0);
 
         // The whole restore sequence, in the order the single button runs it. Mostly a
         // guard against a class going missing from one of the four, which is what a

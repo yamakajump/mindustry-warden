@@ -200,11 +200,15 @@ public class WardenDialog extends BaseDialog {
                 + "launch loadout, then put every remembered block back where it was?", () -> {
                     SectorCapture.Result removed = capture.run();
                     int rubbleGone = rubble.clear();
+                    // Before placing, not after: blocks put back into a burning sector
+                    // are lost faster than they land.
+                    int fires = rubble.extinguish();
                     int cleared = basePlans.clearBlockers(true);
                     int placed = basePlans.placeAll();
                     hide();
                     Vars.ui.showInfoFade(placed + " blocks restored, after clearing "
-                        + (removed.blocks + rubbleGone + cleared) + " that were in the way.", 7f);
+                        + (removed.blocks + rubbleGone + cleared) + " that were in the way"
+                        + (fires > 0 ? " and putting out " + fires + " fires." : "."), 7f);
                 })).size(320f, 60f).padBottom(10f).row();
 
         note(body, "Step by step, if you would rather see each stage:");

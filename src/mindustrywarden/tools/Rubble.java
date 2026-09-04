@@ -5,6 +5,8 @@ import mindustry.Vars;
 import mindustry.content.Blocks;
 import mindustry.game.Team;
 import mindustry.gen.Building;
+import mindustry.gen.Fire;
+import mindustry.gen.Groups;
 import mindustry.world.Tile;
 
 /**
@@ -38,6 +40,22 @@ public final class Rubble {
             building.tile.setNet(Blocks.air);
         }
         return doomed.size;
+    }
+
+    /**
+     * Put out every fire on the map, and return how many were burning.
+     *
+     * <p>The other thing a destroyed base leaves behind, and the one that undoes a
+     * restore while it happens: a base put back into a burning sector loses blocks faster
+     * than they are placed. Copied before removing, since removing walks the same group.
+     */
+    public int extinguish() {
+        Seq<Fire> burning = new Seq<>();
+        Groups.fire.each(burning::add);
+        for (Fire fire : burning) {
+            fire.remove();
+        }
+        return burning.size;
     }
 
     /**
