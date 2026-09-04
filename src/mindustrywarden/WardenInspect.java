@@ -2,12 +2,15 @@ package mindustrywarden;
 
 import arc.Core;
 import arc.struct.ObjectIntMap;
+import arc.struct.Seq;
 import arc.util.Log;
 import mindustry.Vars;
 import mindustry.game.Team;
 import mindustry.game.Teams.TeamData;
+import mindustry.gen.Building;
 import mindustry.gen.Groups;
 import mindustry.io.SaveIO;
+import mindustry.world.Tile;
 
 /**
  * Prints what a save file actually contains, then quits.
@@ -37,8 +40,9 @@ final class WardenInspect {
             return;
         }
 
-        Log.info("[inspect] map @ x @, wave @, attack=@",
-            Vars.world.width(), Vars.world.height(), Vars.state.wave, Vars.state.rules.attackMode);
+        Log.info("[inspect] map @ x @, wave @, attack=@, ghostBlocks=@",
+            Vars.world.width(), Vars.world.height(), Vars.state.wave,
+            Vars.state.rules.attackMode, Vars.state.rules.ghostBlocks);
 
         // Counted from the global building group rather than from the active teams:
         // derelict is never active, so a map covered in rubble reads as empty from the
@@ -54,6 +58,25 @@ final class WardenInspect {
                 Log.info("[inspect] team @: @ buildings, @ remembered plans",
                     team.name, count, plans);
             }
+        }
+
+        // What the map is actually made of, which is the only way to tell a base apart
+        // from another when both belong to the same team and look alike from a screenshot.
+        ObjectIntMap<String> kinds = new ObjectIntMap<>();
+        for (Tile tile : Vars.world.tiles) {
+            Building building = tile.build;
+            if (building != null && building.tile == tile) {
+                kinds.increment(building.team.name + " " + building.block.name);
+            }
+        }
+
+        Seq<String> sorted = new Seq<>();
+        for (var key : kinds.keys()) {
+            sorted.add(key);
+        }
+        sorted.sort((a, b) -> kinds.get(b, 0) - kinds.get(a, 0));
+        for (int i = 0; i < Math.min(25, sorted.size); i++) {
+            Log.info("[inspect]   @ x @", kinds.get(sorted.get(i), 0), sorted.get(i));
         }
 
         Core.app.exit();

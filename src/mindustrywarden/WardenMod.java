@@ -44,6 +44,9 @@ public class WardenMod extends Mod {
             if (WardenInspect.requested()) {
                 new WardenInspect().run();
             }
+            if (WardenRestore.requested()) {
+                new WardenRestore().run();
+            }
         });
     }
 

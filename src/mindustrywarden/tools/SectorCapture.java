@@ -54,6 +54,17 @@ public final class SectorCapture {
     }
 
     public Result run() {
+        return run(true);
+    }
+
+    /**
+     * @param advanceWave whether to jump the wave counter to the winning wave. True when
+     *                    a player asks for a capture, since that is half the win
+     *                    condition on a wave sector. False when a tool is only using this
+     *                    to sweep an enemy off a map, where moving the counter would hand
+     *                    its owner harder waves than the ones they left.
+     */
+    public Result run(boolean advanceWave) {
         Team mine = Vars.player.team();
 
         // The timer first: everything below is pointless if a wave spawns behind it.
@@ -92,7 +103,8 @@ public final class SectorCapture {
         boolean waveSkipped = false;
         // A wave sector is won at its winning wave, so the counter is the other half of
         // the condition. Sectors without one are won by emptying the map alone.
-        if (Vars.state.rules.winWave > 0 && Vars.state.wave < Vars.state.rules.winWave) {
+        if (advanceWave && Vars.state.rules.winWave > 0
+            && Vars.state.wave < Vars.state.rules.winWave) {
             Vars.state.wave = Vars.state.rules.winWave;
             waveSkipped = true;
         }
