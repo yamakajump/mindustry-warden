@@ -191,6 +191,21 @@ public class WardenDialog extends BaseDialog {
             + "covering, which is what the second option is for. Cores are never "
             + "removed.");
 
+        // The one button, because the three below it are almost always used in the same
+        // order and getting that order wrong leaves plans buried under something.
+        body.button("Restore everything", Icon.refresh, Styles.defaultt, Vars.iconMed, () ->
+            Vars.ui.showConfirm("Remove the enemy base and your own launch loadout, then "
+                + "put every remembered block back where it was?", () -> {
+                    SectorCapture.Result removed = capture.run();
+                    int cleared = basePlans.clearBlockers(true);
+                    int placed = basePlans.placeAll();
+                    hide();
+                    Vars.ui.showInfoFade(placed + " blocks restored, after clearing "
+                        + (removed.blocks + cleared) + " that were in the way.", 7f);
+                })).size(320f, 60f).padBottom(10f).row();
+
+        note(body, "Step by step, if you would rather see each stage:");
+
         body.button("1. Clear what covers them", Icon.eraser, Styles.defaultt, Vars.iconMed, () -> {
             int cleared = basePlans.clearBlockers(clearOwn);
             Vars.ui.showInfoFade(cleared == 0

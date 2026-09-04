@@ -152,6 +152,15 @@ final class WardenSelfTest {
         check("the enemy core was removed (" + result.blocks + " blocks)", result.blocks > 0);
         check("the player core survived", Vars.player.team().core() != null);
 
+        // The whole restore sequence, in the order the single button runs it. Mostly a
+        // guard against a class going missing from one of the three, which is what a
+        // hot-swapped jar did to a live game.
+        Vars.world.tile(30, 30).setBlock(Blocks.copperWall, Team.crux, 0);
+        capture.run();
+        plans.clearBlockers(true);
+        plans.placeAll();
+        check("the restore sequence runs end to end", Vars.player.team().core() != null);
+
         Time.run(30f, () -> {
             Log.info(failures == 0
                 ? "[selftest] PASS"
