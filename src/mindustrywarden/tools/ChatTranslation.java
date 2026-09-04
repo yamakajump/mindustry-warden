@@ -3,6 +3,7 @@ package mindustrywarden.tools;
 import arc.Core;
 import arc.Events;
 import arc.struct.ObjectIntMap;
+import arc.struct.ObjectSet;
 import arc.struct.Seq;
 import mindustry.Vars;
 import mindustry.game.EventType.PlayerChatEvent;
@@ -12,19 +13,19 @@ import mindustry.gen.Call;
  * Reads the chat in your language, and answers in the room's.
  *
  * <p>Neither language is configured. Yours is the one the panel already speaks. The
- * room's is worked out from what has been said in it: every incoming line is passed
- * through {@link LanguageGuess}, the last twenty answers are kept, and the one that comes
- * up most is what the room speaks. Joining a Russian server and typing French sends
- * Russian, and none of that took a setting.
+ * room's is worked out from what is said in it: every line is passed through
+ * {@link LanguageGuess}, the last twenty answers are kept, and the one that comes up most
+ * is what the room speaks. Join a Russian server, type French, Russian goes out.
  *
  * <p>A count rather than the last line seen, because a room is not its most recent
  * sentence: one English "hi" in an otherwise Russian channel should not redirect
  * everything that follows.
  *
- * <p>Incoming lines are printed underneath the original, never in place of it: a
- * translation is a guess and a reader should be able to check it. Outgoing lines are sent
- * a second time, translated, because the game announces a message after it has gone
- * rather than before, so a second line is the only thing on offer.
+ * <p>Incoming lines are read from the chat itself rather than from the game's chat event,
+ * because that event only fires for messages that arrive with a sender attached, and a
+ * server that formats its own messages sends them without one. See {@link ChatWatcher}.
+ * The translation then replaces the line in place, which is why it is read from there and
+ * not merely listened to.
  */
 public final class ChatTranslation {
     private static final String enabledSetting = "warden-chat-on";
@@ -38,14 +39,20 @@ public final class ChatTranslation {
 
     private final Translator translator = new Translator();
     private final LanguageGuess guess = new LanguageGuess();
+    private final ChatWatcher watcher = new ChatWatcher();
 
-    /** Languages of the last lines by other people, newest last. */
+    /** Languages of the last lines seen, newest last. */
     private final Seq<String> heard = new Seq<>();
+
+    /** Lines already handled, so a rewritten line is not read as a new one. */
+    private final ObjectSet<String> handled = new ObjectSet<>();
 
     /** Guards against translating a translation we just sent ourselves. */
     private String lastSent = "";
 
     public void install() {
+        // Outgoing lines still come from the event: it is the only place that says a
+        // message is ours, and ours is the only one worth sending twice.
         Events.on(PlayerChatEvent.class, event -> {
             if (event.player == null || event.message == null || event.message.isEmpty()) {
                 return;
@@ -53,27 +60,66 @@ public final class ChatTranslation {
             if (event.message.startsWith("/")) {
                 return;
             }
-
-            // By id, not by instance: on a server the event does not have to carry the
-            // same object as the local player, and mistaking your own line for someone
-            // else's means translating your own translation, on a loop.
-            boolean mine = Vars.player != null && event.player.id == Vars.player.id;
-            if (mine) {
+            if (Vars.player != null && event.player.id == Vars.player.id) {
                 sendTranslation(event.message);
-            } else {
-                remember(event.message);
-                showTranslation(event.player.name, event.message);
             }
         });
     }
 
-    /** Keep track of what language this room speaks, one line at a time. */
-    private void remember(String message) {
-        String language = guess.of(message);
-        if (language == null || language.equals(mine())) {
+    /** Called once per frame: reads what the chat has shown since last time. */
+    public void update() {
+        if (!Vars.state.isGame()) {
             return;
         }
 
+        watcher.poll((index, line) -> {
+            String text = spoken(line);
+            if (text == null || handled.contains(line)) {
+                return;
+            }
+
+            String language = guess.of(text);
+            remember(language);
+
+            if (!enabled() || language == null || language.equals(mine())) {
+                return;
+            }
+
+            handled.add(line);
+            translator.translate(text, language, mine(), translated -> Core.app.post(() -> {
+                String rewritten = line + " [lightgray]| " + translated;
+                if (watcher.replace(line, rewritten)) {
+                    handled.add(rewritten);
+                }
+            }));
+        });
+    }
+
+    /**
+     * The part of a chat line someone actually said.
+     *
+     * <p>A line arrives formatted, name and colour tags included: {@code [coral][Yras][]:
+     * привет}. Translating the whole thing would translate the name and mangle the tags,
+     * so only what follows the last "]:" is taken. That also handles the tags servers
+     * put in front, {@code <T>} and {@code <A>} and the like, since they sit before the
+     * name and the name's bracket is still the last one.
+     *
+     * <p>A line without that shape is a server notice rather than speech, "has connected"
+     * and such, and is left alone.
+     */
+    public static String spoken(String line) {
+        int mark = line.lastIndexOf("]:");
+        if (mark < 0 || mark + 2 >= line.length()) {
+            return null;
+        }
+        String text = line.substring(mark + 2).trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private void remember(String language) {
+        if (language == null || language.equals(mine())) {
+            return;
+        }
         heard.add(language);
         if (heard.size > memory) {
             heard.remove(0);
@@ -131,18 +177,9 @@ public final class ChatTranslation {
         return heard.size;
     }
 
-    private void showTranslation(String sender, String message) {
-        if (!enabled()) {
-            return;
-        }
-        String language = guess.of(message);
-        if (language != null && language.equals(mine())) {
-            return;
-        }
-
-        translator.translate(message, language, mine(), translated ->
-            Core.app.post(() -> Vars.ui.chatfrag.addMessage(
-                "[lightgray]" + sender + "[white]: " + translated)));
+    /** Whether the chat can be read at all, which the panel says rather than hides. */
+    public boolean canRead() {
+        return watcher.available();
     }
 
     private void sendTranslation(String message) {
@@ -185,5 +222,6 @@ public final class ChatTranslation {
     /** Drop what was heard, for when the panel is used to change rooms. */
     public void forget() {
         heard.clear();
+        handled.clear();
     }
 }

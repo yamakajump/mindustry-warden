@@ -48,7 +48,7 @@ public class WardenMod extends Mod {
             Log.info("[warden] ready, press right shift in a game");
 
             if (WardenSelfTest.requested()) {
-                new WardenSelfTest(speed, tuning).run();
+                new WardenSelfTest(speed, tuning, chat).run();
             }
             if (WardenInspect.requested()) {
                 new WardenInspect().run();
@@ -80,6 +80,7 @@ public class WardenMod extends Mod {
             speed.update(dialog.isShown());
             tuning.update();
             snapshots.update();
+            chat.update();
 
             // Once per frame, not once per pass. Fast forward runs the world several
             // times per frame and this listener with it, while keyTap stays true for the

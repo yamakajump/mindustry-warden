@@ -9,6 +9,7 @@ import mindustry.game.Gamemode;
 import mindustry.game.Rules;
 import mindustry.game.Team;
 import mindustry.type.Item;
+import arc.struct.Seq;
 import mindustry.world.Tile;
 import mindustrywarden.tools.BasePlans;
 import mindustrywarden.tools.GameSpeed;
@@ -33,12 +34,15 @@ import mindustrywarden.tools.UnitTuning;
 final class WardenSelfTest {
     private final GameSpeed speed;
     private final UnitTuning tuning;
+    private final mindustrywarden.tools.ChatTranslation chat;
 
     private int failures;
 
-    WardenSelfTest(GameSpeed speed, UnitTuning tuning) {
+    WardenSelfTest(GameSpeed speed, UnitTuning tuning,
+        mindustrywarden.tools.ChatTranslation chat) {
         this.speed = speed;
         this.tuning = tuning;
+        this.chat = chat;
     }
 
     static boolean requested() {
@@ -216,8 +220,48 @@ final class WardenSelfTest {
         // The translator, which is the one tool here that depends on something outside
         // the machine. A failure prints rather than fails the run: no network is a fair
         // reason for this check not to answer, and it must not block the rest.
-        new mindustrywarden.tools.Translator().translate("hello there", "fr",
-            translated -> Log.info("[selftest] ok   translation returned: @", translated));
+        var translator = new mindustrywarden.tools.Translator();
+        translator.translate("hello there", "en", "fr",
+            translated -> Log.info("[selftest] ok   english to french: @", translated));
+        // The case that actually matters: a real line from a Russian server.
+        translator.translate("они все в нулевые корды летят", "ru", "fr",
+            translated -> Log.info("[selftest] ok   russian to french: @", translated));
+
+        // The chat, end to end: a real line from a Russian server, put in the way a
+        // server puts it, then read, translated and rewritten in place. This is the path
+        // that quietly did nothing when it was built on the game's chat event, which
+        // servers formatting their own messages never fire.
+        var spoken = mindustrywarden.tools.ChatTranslation.spoken("[coral][Yras][]: привет всем");
+        check("plain line (" + spoken + ")", "привет всем".equals(spoken));
+        var tagged = mindustrywarden.tools.ChatTranslation.spoken("<T> [Yras]: надо всеь");
+        check("tagged line (" + tagged + ")", "надо всеь".equals(tagged));
+        var admin = mindustrywarden.tools.ChatTranslation.spoken("<A> [Kefir 225 Sector]: Да");
+        check("admin line (" + admin + ")", "Да".equals(admin));
+        check("a notice is not speech",
+            mindustrywarden.tools.ChatTranslation.spoken("yamakajump has connected.") == null);
+
+        // The watcher, in one frame. It cannot be checked across frames here: the chat
+        // fragment empties itself whenever the network is idle
+        // (ChatFragment: "if(!net.active() && messages.size > 0) clearMessages()"), so in
+        // single player a line does not survive to the next frame. On a server, which is
+        // the only place this feature runs, it does.
+        check("the chat can be read", chat.canRead());
+        chat.enabled(true);
+
+        var watcher = new mindustrywarden.tools.ChatWatcher();
+        watcher.poll((index, line) -> { });
+
+        String line = "<T> [Yras]: они все в нулевые корды летят";
+        Vars.ui.chatfrag.addMessage(line);
+
+        Seq<String> caught = new Seq<>();
+        watcher.poll((index, shown) -> caught.add(shown));
+        check("the watcher saw the line (" + caught.size + ")", caught.contains(line));
+
+        check("and can rewrite it in place",
+            watcher.replace(line, line + " [lightgray]| ils volent tous vers zéro"));
+        check("the rewrite is what the chat now holds",
+            watcher.snapshot().contains(shown -> shown.contains("[lightgray]|")));
 
         Time.run(200f, () -> {
             Log.info(failures == 0
