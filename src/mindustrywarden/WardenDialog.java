@@ -63,7 +63,7 @@ public class WardenDialog extends BaseDialog {
     }
 
     private static final float menuWidth = 230f;
-    private static final float cardWidth = 190f;
+    private static final float cardWidth = 168f;
     private static final float cardHeight = 100f;
     private static final float mainButton = 430f;
 
@@ -169,13 +169,24 @@ public class WardenDialog extends BaseDialog {
         }).width(width).maxHeight(height);
     }
 
-    /** One figure, one word. What a paragraph was trying to say. */
+    /**
+     * One figure, one word. What a paragraph was trying to say.
+     *
+     * <p>A number gets the big type it deserves; a word does not, since "capturé" at that
+     * size is wider than the card holding it and comes out as "captur". Both are centred
+     * and wrapped to the card rather than trusted to fit.
+     */
     private void card(Table table, Object value, String labelKey, boolean warn) {
+        String text = String.valueOf(value);
+        boolean numeric = text.matches("[0-9/]+");
+
         table.table(Tex.pane, card -> {
-            card.add(String.valueOf(value)).style(Styles.outlineLabel).fontScale(1.7f)
-                .color(warn ? Pal.remove : Pal.accent).row();
+            card.add(text).style(Styles.outlineLabel).fontScale(numeric ? 1.7f : 1.0f)
+                .color(warn ? Pal.remove : Pal.accent).width(cardWidth - 18f).wrap()
+                .get().setAlignment(arc.util.Align.center);
+            card.row();
             card.add(Lang.get(labelKey)).color(Pal.lightishGray);
-        }).size(cardWidth, cardHeight).pad(5f);
+        }).size(cardWidth, cardHeight).pad(4f);
     }
 
     private void title(Table table, String key) {
@@ -194,12 +205,8 @@ public class WardenDialog extends BaseDialog {
                 + (Vars.state.rules.winWave > 0 ? "/" + Vars.state.rules.winWave : ""),
                 "capture.wave", false);
             card(cards, Vars.state.enemies, "capture.enemies", Vars.state.enemies > 0);
-
-            mindustry.type.Sector sector = Vars.state.rules.sector;
-            if (sector != null) {
-                card(cards, Lang.get(sector.isCaptured() ? "capture.captured" : "capture.open"),
-                    "capture.state", false);
-            }
+            // Three cards, not four: a fourth is one card too many for the narrowest
+            // interface scale, and the sector's state is said in words below anyway.
         }).padBottom(12f).row();
 
         mindustry.type.Sector current = Vars.state.rules.sector;
