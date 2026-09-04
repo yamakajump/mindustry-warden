@@ -1,5 +1,6 @@
 package mindustrywarden.tools;
 
+import arc.struct.ObjectSet;
 import arc.struct.Seq;
 import mindustry.Vars;
 import mindustry.ctype.UnlockableContent;
@@ -15,6 +16,9 @@ import mindustry.world.blocks.storage.CoreBlock.CoreBuild;
  * unlocking research touches the campaign profile and outlives the session.
  */
 public final class Supplies {
+    private Planet cachedPlanet;
+    private ObjectSet<Item> cached;
+
     /**
      * Items that belong on the planet this game is played on.
      *
@@ -32,10 +36,43 @@ public final class Supplies {
         if (planet == null) {
             return true;
         }
-        if (item.techNodes != null && !item.techNodes.isEmpty()) {
-            return item.techNodes.contains(node -> node.planet == null || node.planet == planet);
+
+        boolean researchedSomewhere = item.techNode != null
+            || (item.techNodes != null && !item.techNodes.isEmpty());
+
+        // Researched on some planet, but not this one's tree: it is the other planet's.
+        // Researched nowhere at all, like sand or scrap, so offered everywhere.
+        return !researchedSomewhere || treeOf(planet).contains(item);
+    }
+
+    /**
+     * Every item reachable in a planet's tech tree.
+     *
+     * <p>Asking an item which planet it belongs to does not work: {@code TechNode.planet}
+     * is set on a tree's root and left null on the nodes below it, so beryllium answers
+     * "nowhere" and passes for a Serpulo item. Reading the tree from the planet down
+     * gives the same answer from the side where the data actually exists.
+     *
+     * <p>Cached per planet, since a tree is walked identically on every call and the
+     * panel calls this once per item on every rebuild.
+     */
+    private ObjectSet<Item> treeOf(Planet planet) {
+        if (planet == cachedPlanet && cached != null) {
+            return cached;
         }
-        return item.techNode == null || item.techNode.planet == null || item.techNode.planet == planet;
+
+        ObjectSet<Item> items = new ObjectSet<>();
+        if (planet.techTree != null) {
+            planet.techTree.each(node -> {
+                if (node.content instanceof Item item) {
+                    items.add(item);
+                }
+            });
+        }
+
+        cachedPlanet = planet;
+        cached = items;
+        return items;
     }
 
     /** Items to offer: this planet's, or the whole game when asked for it. */

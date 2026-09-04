@@ -34,6 +34,10 @@ public class WardenMod extends Mod {
             dialog = new WardenDialog(speed, tuning);
             hookUpdate();
             Log.info("[warden] ready, press right shift in a game");
+
+            if (WardenSelfTest.requested()) {
+                new WardenSelfTest(speed, tuning).run();
+            }
         });
     }
 
@@ -49,8 +53,10 @@ public class WardenMod extends Mod {
     private void hookUpdate() {
         Events.run(Trigger.update, () -> {
             // Before the key handling and its early returns: both of these have to run on
-            // every frame, whatever the panel and the chat are doing.
-            speed.update();
+            // every frame, whatever the panel and the chat are doing. The panel being
+            // open suspends fast forward, so a game crawling at 64x answers the mouse
+            // again as soon as you open the thing that turns it back down.
+            speed.update(dialog.isShown());
             tuning.update();
 
             if (Vars.state.isMenu() || Vars.ui.chatfrag.shown() || Vars.ui.consolefrag.shown()) {

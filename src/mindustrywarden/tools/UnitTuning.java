@@ -26,7 +26,7 @@ public final class UnitTuning {
     private float unitSpeed = 1f;
     private boolean wholeTeam;
 
-    /** Re-apply the movement multiplier, which the game clears on every tick. */
+    /** Re-apply the movement speed, which lasts one tick and has to be renewed. */
     public void update() {
         if (unitSpeed == 1f || !Vars.state.isPlaying()) {
             return;
@@ -34,19 +34,61 @@ public final class UnitTuning {
 
         if (wholeTeam) {
             for (Unit unit : Vars.player.team().data().units) {
-                unit.speedMultiplier(unitSpeed);
+                accelerate(unit);
             }
         } else if (!Vars.player.dead() && Vars.player.unit() != null) {
-            Vars.player.unit().speedMultiplier(unitSpeed);
+            accelerate(Vars.player.unit());
         }
+    }
+
+    /**
+     * Speed one unit up for this tick.
+     *
+     * <p>Not by writing {@code speedMultiplier}, which was the first attempt and did
+     * nothing: the game fires {@code Trigger.update} at the very top of its own update
+     * and clears every multiplier back to 1 further down the same frame, so anything
+     * written from a listener is erased before it is read. {@code statusSpeed} goes
+     * through a dynamic status effect instead, which is re-applied during that same
+     * clearing pass, and it takes an absolute speed in tiles per second rather than a
+     * factor.
+     */
+    private void accelerate(Unit unit) {
+        unit.statusSpeed(unit.type.speed * 60f / Vars.tilesize * unitSpeed);
     }
 
     public float unitSpeed() {
         return unitSpeed;
     }
 
+    /**
+     * Set the movement multiplier, and hand back what was sped up when it returns to 1.
+     *
+     * <p>The dynamic status this goes through is applied with an infinite duration, so it
+     * does not wear off on its own: simply stopping would leave every unit touched at
+     * whatever multiplier was last written, for the rest of the game. This was a real
+     * bug, and it is why coming back down is an explicit step rather than an absence.
+     */
     public void unitSpeed(float value) {
+        float previous = unitSpeed;
         unitSpeed = Math.max(1f, Math.min(value, steps[steps.length - 1]));
+
+        if (previous != 1f && unitSpeed == 1f) {
+            restore();
+        }
+    }
+
+    /** Write a multiplier of 1 back onto everything this could have touched. */
+    private void restore() {
+        if (!Vars.state.isGame()) {
+            return;
+        }
+        for (Unit unit : Vars.player.team().data().units) {
+            unit.statusSpeed(unit.type.speed * 60f / Vars.tilesize);
+        }
+        if (!Vars.player.dead() && Vars.player.unit() != null) {
+            Unit unit = Vars.player.unit();
+            unit.statusSpeed(unit.type.speed * 60f / Vars.tilesize);
+        }
     }
 
     public boolean wholeTeam() {
@@ -56,15 +98,12 @@ public final class UnitTuning {
     /**
      * Switch between your own unit and every unit of your team.
      *
-     * <p>Turning it off puts the team back to 1 by hand: the field is reset each tick
-     * only for units something still writes to, and a unit left at 16x with nothing
-     * writing to it keeps the last value written.
+     * <p>Narrowing the scope hands the rest of the team back its own speed, for the same
+     * reason the multiplier does: nothing expires by itself here.
      */
     public void wholeTeam(boolean value) {
         if (wholeTeam && !value) {
-            for (Unit unit : Vars.player.team().data().units) {
-                unit.speedMultiplier(1f);
-            }
+            restore();
         }
         wholeTeam = value;
     }

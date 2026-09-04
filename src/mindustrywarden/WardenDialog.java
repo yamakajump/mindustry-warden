@@ -398,10 +398,17 @@ public class WardenDialog extends BaseDialog {
             }
         }).padBottom(6f).row();
 
-        note(body, "Everything moves: units, conveyors, waves, you. Above 1x the world is run\n"
+        body.table(Tex.pane, status -> {
+            status.defaults().left().growX().pad(2f);
+            status.label(() -> "Actually running at " + label(speed.achieved()))
+                .update(label -> label.setColor(speed.throttled() ? Pal.accent : Pal.lightishGray)).row();
+        }).width(panelWidth - 24f).pad(6f).row();
+
+        note(body, "Everything moves: units, conveyors, waves, you. Above 1x the world runs\n"
             + "several times per frame rather than in bigger steps, so the simulation stays\n"
-            + "exact and it is the frame rate that pays. Expect a slideshow at 32x and 64x\n"
-            + "on a large map. It ends when you come back down.");
+            + "exact. The number is a ceiling, not a promise: extra ticks only get a few\n"
+            + "milliseconds per frame, so a big base will run below what you asked rather\n"
+            + "than freeze. Fast forward also pauses while this panel is open.");
 
         header(body, "Your movement speed");
 

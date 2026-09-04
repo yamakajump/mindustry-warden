@@ -58,6 +58,22 @@ Needs a JDK 17 and nothing else; Gradle pulls the game's classes itself.
 ./gradlew jar     # build/libs/mindustry-warden.jar
 ```
 
+## Test
+
+Every tool here reaches into a running game, so a unit test would be testing mocks. The
+self-test drives them for real instead: it builds a throwaway world, gives itself a core
+and an enemy, exercises each tool and prints what happened.
+
+```bash
+export MINDUSTRY_DATA_DIR=/tmp/warden-test        # never your own save directory
+cp build/libs/mindustry-warden.jar "$MINDUSTRY_DATA_DIR/mods/"
+WARDEN_SELFTEST=1 java -jar Mindustry.jar         # the release jar, not the Steam one
+```
+
+It prints one line per check and ends on `PASS` or `FAIL`, then closes the game. The Steam
+build refuses to start outside Steam, so use the jar from the
+[v159.7 release](https://github.com/Anuken/Mindustry/releases/tag/v159.7).
+
 ## Licence
 
 MIT.
