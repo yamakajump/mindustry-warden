@@ -43,7 +43,6 @@ public class WardenMod extends Mod {
         Events.on(ClientLoadEvent.class, event -> {
             speed.install();
             dialog = new WardenDialog(speed, tuning, snapshots, chat);
-            chat.install();
             hookUpdate();
             Log.info("[warden] ready, press right shift in a game");
 

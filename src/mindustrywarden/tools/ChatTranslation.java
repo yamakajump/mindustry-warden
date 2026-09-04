@@ -1,13 +1,11 @@
 package mindustrywarden.tools;
 
 import arc.Core;
-import arc.Events;
 import arc.struct.ObjectIntMap;
 import arc.struct.ObjectSet;
 import arc.struct.Seq;
 import arc.util.Log;
 import mindustry.Vars;
-import mindustry.game.EventType.PlayerChatEvent;
 import mindustry.gen.Call;
 
 /**
@@ -64,21 +62,14 @@ public final class ChatTranslation {
     /** Guards against translating a translation we just sent ourselves. */
     private String lastSent = "";
 
-    public void install() {
-        // Outgoing lines still come from the event: it is the only place that says a
-        // message is ours, and ours is the only one worth sending twice.
-        Events.on(PlayerChatEvent.class, event -> {
-            if (event.player == null || event.message == null || event.message.isEmpty()) {
-                return;
-            }
-            if (event.message.startsWith("/")) {
-                return;
-            }
-            if (Vars.player != null && event.player.id == Vars.player.id) {
-                sendTranslation(event.message);
-            }
-        });
-    }
+    /**
+     * The last line of ours that was translated.
+     *
+     * <p>A second guard against sending twice. The first version had two ways of noticing
+     * an outgoing line, the chat event and the chat itself, and on a server where both
+     * work every message went out in duplicate.
+     */
+    private String lastTranslated = "";
 
     /** Called once per frame: reads what the chat has shown since last time. */
     public void update() {
@@ -273,10 +264,12 @@ public final class ChatTranslation {
         if (!enabled()) {
             return;
         }
-        if (message.equals(lastSent)) {
-            // Our own translation coming back around, not something new to send.
+        if (message.equals(lastSent) || message.equals(lastTranslated)) {
+            // Either our own translation coming back around, or the same line reaching
+            // here twice. Neither is something new to send.
             return;
         }
+        lastTranslated = message;
 
         String room = roomLanguage();
         if (room == null) {
