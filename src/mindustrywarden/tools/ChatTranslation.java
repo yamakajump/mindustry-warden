@@ -29,7 +29,12 @@ public final class ChatTranslation {
 
     private final Translator translator = new Translator();
 
-    /** Guards against translating a translation we just sent ourselves. */
+    /**
+     * Guards against translating a translation we just sent ourselves.
+     *
+     * <p>Belt and braces with the id check above: two ways to spot our own line, because
+     * the failure mode is a loop that floods a server's chat.
+     */
     private String lastSent = "";
 
     public void install() {
@@ -41,7 +46,10 @@ public final class ChatTranslation {
                 return;
             }
 
-            boolean mine = event.player == Vars.player;
+            // By id, not by instance: on a server the player carried by the event is
+            // not guaranteed to be the same object as the local one, and getting this
+            // wrong means translating your own translation, forever.
+            boolean mine = Vars.player != null && event.player.id == Vars.player.id;
             if (mine) {
                 sendTranslation(event.message);
             } else {

@@ -47,21 +47,32 @@ import mindustrywarden.tools.UnitTuning;
  */
 public class WardenDialog extends BaseDialog {
     private enum Tab {
-        capture("tab.capture", Icon.modeAttack),
-        recover("tab.recover", Icon.hammer),
-        backups("tab.backups", Icon.save),
-        units("tab.units", Icon.units),
-        supplies("tab.supplies", Icon.box),
-        speed("tab.speed", Icon.waves),
-        chat("tab.chat", Icon.chat),
-        settings("tab.settings", Icon.settings);
+        capture("tab.capture", Icon.modeAttack, true),
+        recover("tab.recover", Icon.hammer, true),
+        backups("tab.backups", Icon.save, true),
+        units("tab.units", Icon.units, true),
+        supplies("tab.supplies", Icon.box, true),
+        speed("tab.speed", Icon.waves, true),
+        chat("tab.chat", Icon.chat, false),
+        settings("tab.settings", Icon.settings, false);
 
         final String key;
         final TextureRegionDrawable icon;
 
-        Tab(String key, TextureRegionDrawable icon) {
+        /**
+         * Whether this section changes the world, and so needs to own it.
+         *
+         * <p>Most do. Chat and settings do not: translating a line someone else typed
+         * touches nothing the host simulates, and the first version refused to open at
+         * all on a server, which made the translator unreachable exactly where it was
+         * needed.
+         */
+        final boolean needsHost;
+
+        Tab(String key, TextureRegionDrawable icon, boolean needsHost) {
             this.key = key;
             this.icon = icon;
+            this.needsHost = needsHost;
         }
     }
 
@@ -115,6 +126,10 @@ public class WardenDialog extends BaseDialog {
     }
 
     public void open() {
+        // Land on something usable: a guest on someone's server can still translate.
+        if (tab.needsHost && !HostGuard.allowed()) {
+            tab = Tab.chat;
+        }
         rebuild();
         show();
     }
@@ -180,6 +195,19 @@ public class WardenDialog extends BaseDialog {
             root.pane(body -> {
                 body.top().left();
                 body.defaults().left();
+
+                if (tab.needsHost && !HostGuard.allowed()) {
+                    body.table(Tex.pane, warning -> {
+                        warning.image(Icon.warning).color(Pal.remove)
+                            .size(Vars.iconLarge).padRight(12f);
+                        warning.add(Vars.state.isGame()
+                            ? Lang.get("guard.client")
+                            : Lang.get("guard.nogame"))
+                            .wrap().width(contentWidth - 80f).color(Pal.lightishGray);
+                    }).width(contentWidth).pad(10f).row();
+                    return;
+                }
+
                 switch (tab) {
                     case capture -> buildCapture(body);
                     case recover -> buildRecover(body);
