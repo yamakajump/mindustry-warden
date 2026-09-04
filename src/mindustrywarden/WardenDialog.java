@@ -10,6 +10,7 @@ import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
+import mindustrywarden.tools.BasePlans;
 import mindustrywarden.tools.GameSpeed;
 import mindustrywarden.tools.Invulnerability;
 import mindustrywarden.tools.SectorCapture;
@@ -33,6 +34,7 @@ import mindustrywarden.tools.UnitSpawner;
 public class WardenDialog extends BaseDialog {
     private enum Tab {
         capture("Capture", Icon.modeAttack),
+        recover("Recover", Icon.hammer),
         units("Units", Icon.units),
         supplies("Supplies", Icon.box),
         speed("Speed", Icon.waves);
@@ -51,6 +53,7 @@ public class WardenDialog extends BaseDialog {
     private static final int unitsPerRow = 9;
 
     private final SectorCapture capture = new SectorCapture();
+    private final BasePlans basePlans = new BasePlans();
     private final UnitSpawner spawner = new UnitSpawner();
     private final Supplies supplies = new Supplies();
     private final Invulnerability invulnerability = new Invulnerability();
@@ -81,7 +84,9 @@ public class WardenDialog extends BaseDialog {
                 tabs.button(candidate.title, candidate.icon, Styles.flatTogglet, Vars.iconMed, () -> {
                     tab = candidate;
                     rebuild();
-                }).checked(button -> tab == candidate).size(150f, 52f).pad(2f);
+                // Five tabs across the panel width, so the bar cannot outgrow the body
+                // below it and leave the dialog wider than its own content.
+                }).checked(button -> tab == candidate).size(120f, 52f).pad(2f);
             }
         }).padBottom(8f).row();
 
@@ -98,6 +103,7 @@ public class WardenDialog extends BaseDialog {
             body.defaults().left();
             switch (tab) {
                 case capture -> buildCapture(body);
+                case recover -> buildRecover(body);
                 case units -> buildUnits(body);
                 case supplies -> buildSupplies(body);
                 case speed -> buildSpeed(body);
@@ -153,6 +159,54 @@ public class WardenDialog extends BaseDialog {
                 }
             });
         }).size(240f, 54f).padTop(4f).row();
+    }
+
+    private void buildRecover(Table body) {
+        header(body, "Recover your destroyed base");
+
+        body.table(Tex.pane, status -> {
+            status.defaults().left().growX().pad(2f);
+            status.label(() -> basePlans.plans().size + " destroyed blocks remembered")
+                .update(label -> label.setColor(basePlans.plans().isEmpty() ? Pal.lightishGray : Pal.accent))
+                .row();
+        }).width(panelWidth - 24f).pad(6f).row();
+
+        note(body, "The game files every building of yours that dies, with its position and\n"
+            + "its configuration, and keeps the list in the save. Clear what was built on\n"
+            + "top of them first: a plan under an enemy block queues fine and then never\n"
+            + "builds, because nothing can be placed on an occupied tile.");
+
+        body.button("1. Clear what covers them", Icon.eraser, Styles.defaultt, Vars.iconMed, () -> {
+            int cleared = basePlans.clearBlockers();
+            Vars.ui.showInfoFade(cleared == 0
+                ? "Nothing was standing on your plans."
+                : cleared + " tiles cleared of what was built over your base.", 5f);
+        }).size(320f, 54f).padBottom(4f).row();
+
+        body.button("2. Queue everything for rebuild", Icon.hammer, Styles.defaultt, Vars.iconMed, () -> {
+            int queued = basePlans.queueAll();
+            if (queued == 0) {
+                Vars.ui.showInfo("Nothing to rebuild: the game remembers no destroyed block\n"
+                    + "for your team on this map.");
+                return;
+            }
+            hide();
+            Vars.ui.showInfoFade(queued + " blocks queued. Your builders and any support\n"
+                + "unit on the map will work through them.", 6f);
+        }).size(320f, 54f).padBottom(16f).row();
+
+        header(body, "Take it somewhere else");
+
+        note(body, "Saves the same plans as schematics, cut into pieces the game will accept,\n"
+            + "so the base can be rebuilt on another sector entirely. Logic processor links\n"
+            + "keep their old absolute positions and will need redoing.");
+
+        body.button("Export to schematics", Icon.copy, Styles.defaultt, Vars.iconMed, () -> {
+            var saved = basePlans.export("Recovered base");
+            Vars.ui.showInfoFade(saved.isEmpty()
+                ? "Nothing to export."
+                : saved.size + " schematics saved, look for \"Recovered base\".", 6f);
+        }).size(320f, 54f).row();
     }
 
     private void buildUnits(Table body) {

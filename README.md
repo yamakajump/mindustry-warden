@@ -14,6 +14,7 @@ Built against Mindustry **v159.7**.
 | Tab | What it does |
 |---|---|
 | **Capture** | Removes every enemy building and unit, holds the wave timer back, and lets the game declare the win itself, which is what makes a campaign sector count as captured. A live panel shows the win condition and what is still standing in its way. |
+| **Recover** | Brings a griefed base back. The game files every destroyed building of yours, with its configuration, and keeps the list in the save; this clears whatever was built on top of them, queues them all for rebuild, and can export them as schematics to rebuild elsewhere. |
 | **Units** | Spawns any unit, for any team, in batches. |
 | **Supplies** | Fills the core with every item, and unlocks the research tree. |
 | **Speed** | Runs the simulation from 0.25x to 3x, and makes your blocks and units invulnerable. |
