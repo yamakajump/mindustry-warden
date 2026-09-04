@@ -31,6 +31,7 @@ public final class Lang {
         put("tab.units", "Units", "Unités");
         put("tab.supplies", "Stock", "Stock");
         put("tab.speed", "Speed", "Vitesse");
+        put("tab.chat", "Chat", "Chat");
         put("tab.settings", "Settings", "Réglages");
 
         put("guard.nogame", "Load a game first.", "Charge une partie d'abord.");
@@ -173,6 +174,26 @@ public final class Lang {
             "Tes blocs et unités survivent à tout : le feu, les vagues, un réacteur saboté. "
                 + "C'est une règle d'équipe, donc écrite dans la sauvegarde. Coupe-le avant d'arrêter.");
 
+        put("chat.read", "Translate what I read", "Traduire ce que je lis");
+        put("chat.read.hint",
+            "Every incoming line is printed again underneath, in your language. The "
+                + "original stays: a translation is a guess, and you should be able to "
+                + "check it.",
+            "Chaque message reçu est réaffiché en dessous, dans ta langue. L'original "
+                + "reste : une traduction est une supposition, tu dois pouvoir la vérifier.");
+        put("chat.write", "Translate what I write", "Traduire ce que j'écris");
+        put("chat.write.hint",
+            "Your message is sent a second time, translated. The game gives no way to "
+                + "catch a line on its way out, so it is that or nothing.",
+            "Ton message est renvoyé une seconde fois, traduit. Le jeu ne permet pas "
+                + "d'intercepter un message avant l'envoi, donc c'est ça ou rien.");
+        put("chat.into", "I read in", "Je lis en");
+        put("chat.out", "They read in", "Ils lisent en");
+        put("chat.privacy",
+            "Chat lines are sent to Google to be translated. Nothing else leaves your "
+                + "machine, and nothing is sent while both switches are off.",
+            "Les messages sont envoyés à Google pour être traduits. Rien d'autre ne quitte "
+                + "ta machine, et rien n'est envoyé si les deux interrupteurs sont éteints.");
         put("settings.language", "Language", "Langue");
         put("settings.key", "Panel key", "Touche du panneau");
         put("settings.key.value", "Right shift", "Maj droite");

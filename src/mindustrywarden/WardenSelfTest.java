@@ -195,7 +195,13 @@ final class WardenSelfTest {
         check("and it is listed", !snapshots.list().isEmpty());
         check("its age reads as recent", snapshots.minutesOld(snapshots.list().first()) == 0);
 
-        Time.run(30f, () -> {
+        // The translator, which is the one tool here that depends on something outside
+        // the machine. A failure prints rather than fails the run: no network is a fair
+        // reason for this check not to answer, and it must not block the rest.
+        new mindustrywarden.tools.Translator().translate("hello there", "fr",
+            translated -> Log.info("[selftest] ok   translation returned: @", translated));
+
+        Time.run(200f, () -> {
             Log.info(failures == 0
                 ? "[selftest] PASS"
                 : "[selftest] FAIL, " + failures + " checks failed");

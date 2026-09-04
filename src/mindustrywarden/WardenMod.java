@@ -8,6 +8,7 @@ import mindustry.Vars;
 import mindustry.game.EventType.ClientLoadEvent;
 import mindustry.game.EventType.Trigger;
 import mindustry.mod.Mod;
+import mindustrywarden.tools.ChatTranslation;
 import mindustrywarden.tools.GameSpeed;
 import mindustrywarden.tools.Snapshots;
 import mindustrywarden.tools.UnitTuning;
@@ -29,6 +30,9 @@ public class WardenMod extends Mod {
     /** Copies the sector on a timer, which is the only real safety net here. */
     private final Snapshots snapshots = new Snapshots();
 
+    /** Reads the chat in your language and answers in theirs. */
+    private final ChatTranslation chat = new ChatTranslation();
+
     /** Keeps one key press from being read once per simulation pass. */
     private final FrameGate keys = new FrameGate();
 
@@ -38,7 +42,8 @@ public class WardenMod extends Mod {
     public void init() {
         Events.on(ClientLoadEvent.class, event -> {
             speed.install();
-            dialog = new WardenDialog(speed, tuning, snapshots);
+            dialog = new WardenDialog(speed, tuning, snapshots, chat);
+            chat.install();
             hookUpdate();
             Log.info("[warden] ready, press right shift in a game");
 

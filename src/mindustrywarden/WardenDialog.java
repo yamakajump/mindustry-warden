@@ -17,12 +17,14 @@ import mindustry.type.UnitType;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
 import mindustrywarden.tools.BasePlans;
+import mindustrywarden.tools.ChatTranslation;
 import mindustrywarden.tools.GameSpeed;
 import mindustrywarden.tools.Invulnerability;
 import mindustrywarden.tools.Rubble;
 import mindustrywarden.tools.SectorCapture;
 import mindustrywarden.tools.Snapshots;
 import mindustrywarden.tools.Supplies;
+import mindustrywarden.tools.Translator;
 import mindustrywarden.tools.UnitSpawner;
 import mindustrywarden.tools.UnitTuning;
 
@@ -51,6 +53,7 @@ public class WardenDialog extends BaseDialog {
         units("tab.units", Icon.units),
         supplies("tab.supplies", Icon.box),
         speed("tab.speed", Icon.waves),
+        chat("tab.chat", Icon.chat),
         settings("tab.settings", Icon.settings);
 
         final String key;
@@ -85,6 +88,7 @@ public class WardenDialog extends BaseDialog {
     private final UnitSpawner spawner = new UnitSpawner();
     private final Supplies supplies = new Supplies();
     private final Invulnerability invulnerability = new Invulnerability();
+    private final ChatTranslation chat;
     private final GameSpeed speed;
     private final UnitTuning tuning;
 
@@ -97,11 +101,13 @@ public class WardenDialog extends BaseDialog {
     private Team unitTeam;
     private int unitCount = 1;
 
-    public WardenDialog(GameSpeed speed, UnitTuning tuning, Snapshots snapshots) {
+    public WardenDialog(GameSpeed speed, UnitTuning tuning, Snapshots snapshots,
+        ChatTranslation chat) {
         super(Lang.get("title"));
         this.speed = speed;
         this.tuning = tuning;
         this.snapshots = snapshots;
+        this.chat = chat;
         addCloseButton();
 
         // Sized against the screen, so a window resize has to rebuild it.
@@ -181,6 +187,7 @@ public class WardenDialog extends BaseDialog {
                     case units -> buildUnits(body);
                     case supplies -> buildSupplies(body);
                     case speed -> buildSpeed(body);
+                    case chat -> buildChat(body);
                     case settings -> buildSettings(body);
                 }
             }).scrollX(false).grow().pad(4f);
@@ -681,6 +688,51 @@ public class WardenDialog extends BaseDialog {
 
         body.check(Lang.get("speed.invulnerable"), invulnerability.enabled(),
             invulnerability::toggle).left().tooltip(Lang.get("speed.invulnerable.hint")).row();
+    }
+
+    private void buildChat(Table body) {
+        title(body, "tab.chat");
+
+        body.check(Lang.get("chat.read"), chat.reading(), chat::reading)
+            .left().tooltip(Lang.get("chat.read.hint")).padBottom(6f).row();
+
+        body.table(row -> {
+            row.left();
+            row.add(Lang.get("chat.into")).color(Pal.lightishGray)
+                .width(Math.min(160f, contentWidth * 0.3f));
+            languages(row, chat.into(), chat::into);
+        }).padBottom(14f).row();
+
+        body.check(Lang.get("chat.write"), chat.writing(), chat::writing)
+            .left().tooltip(Lang.get("chat.write.hint")).padBottom(6f).row();
+
+        body.table(row -> {
+            row.left();
+            row.add(Lang.get("chat.out")).color(Pal.lightishGray)
+                .width(Math.min(160f, contentWidth * 0.3f));
+            languages(row, chat.out(), chat::out);
+        }).padBottom(14f).row();
+
+        body.add(Lang.get("chat.privacy")).color(Pal.lightishGray).wrap()
+            .width(contentWidth).row();
+    }
+
+    /** The language buttons, shared by both directions of the chat. */
+    private void languages(Table table, String current, arc.func.Cons<String> pick) {
+        int index = 0;
+        for (String code : Translator.languages) {
+            // The button shows "zh", the request still asks for "zh-CN": the full code
+            // does not fit and comes out broken across two lines.
+            table.button(code.length() > 2 ? code.substring(0, 2) : code, Styles.togglet, () -> {
+                pick.get(code);
+                rebuild();
+            }).checked(button -> current.equals(code)).size(78f, 44f).pad(2f);
+
+            if (++index % Math.max(1, fit(82f) - 2) == 0) {
+                table.row();
+                table.add("").width(Math.min(160f, contentWidth * 0.3f));
+            }
+        }
     }
 
     private void buildSettings(Table body) {
