@@ -25,6 +25,9 @@ public class WardenMod extends Mod {
     /** Kept for the same reason: movement speed has to be written every tick. */
     private final UnitTuning tuning = new UnitTuning();
 
+    /** Keeps one key press from being read once per simulation pass. */
+    private final FrameGate keys = new FrameGate();
+
     private WardenDialog dialog;
 
     @Override
@@ -59,6 +62,13 @@ public class WardenMod extends Mod {
             speed.update(dialog.isShown());
             tuning.update();
 
+            // Once per frame, not once per pass. Fast forward runs the world several
+            // times per frame and this listener with it, while keyTap stays true for the
+            // whole frame: without the gate, one press toggled the panel once per pass
+            // and the window only ever flashed.
+            if (!keys.firstThisFrame()) {
+                return;
+            }
             if (Vars.state.isMenu() || Vars.ui.chatfrag.shown() || Vars.ui.consolefrag.shown()) {
                 return;
             }

@@ -138,6 +138,11 @@ final class WardenSelfTest {
         check("the open panel suspends it", speed.achieved() == 1f);
         speed.multiplier(1f);
 
+        // The panel key, which fast forward read once per simulation pass and turned into
+        // a window flashing open and shut.
+        FrameGate gate = new FrameGate();
+        check("a key is read once per frame", gate.firstThisFrame() && !gate.firstThisFrame());
+
         BasePlans plans = new BasePlans();
         check("no plans in a fresh world", plans.plans().isEmpty());
         check("clearing nothing is harmless", plans.clearBlockers(false) >= 0);
