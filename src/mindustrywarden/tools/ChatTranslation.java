@@ -112,11 +112,11 @@ public final class ChatTranslation {
             if (!enabled()) {
                 return;
             }
-            if (language == null) {
+            if (language == null && !worthTrying(text)) {
                 Log.info("[warden] no language for: @", text);
                 return;
             }
-            if (language.equals(mine())) {
+            if (language != null && language.equals(mine())) {
                 return;
             }
 
@@ -247,11 +247,27 @@ public final class ChatTranslation {
                 inside = true;
             } else if (c == ']') {
                 inside = false;
-            } else if (!inside) {
+            } else if (!inside && !isGameIcon(c)) {
                 out.append(c);
             }
         }
         return out.toString();
+    }
+
+    /**
+     * Whether a character is one of the game's own icons rather than a letter.
+     *
+     * <p>Mindustry draws items and blocks in chat as characters borrowed from three
+     * Unicode ranges its icon font sits in. Nearly half of one evening's messages carried
+     * at least one, and they cost twice over: the translator sees "encore" as Tibetan
+     * script and sometimes returns a 500, and whatever survives comes back with the icon
+     * stuck to a French word. Neither is worth keeping, so they go before anything is
+     * sent.
+     */
+    private static boolean isGameIcon(char c) {
+        return (c >= '\u0F00' && c <= '\u0FFF')
+            || (c >= '\u1000' && c <= '\u109F')
+            || (c >= '\uE000' && c <= '\uF8FF');
     }
 
     /**
@@ -272,6 +288,27 @@ public final class ChatTranslation {
         String header = withoutTags(line.substring(0, mark));
         String me = withoutTags(Vars.player.name).trim();
         return !me.isEmpty() && header.contains(me);
+    }
+
+    /**
+     * Whether an unrecognised line is worth translating anyway.
+     *
+     * <p>The detector answers nothing for a line holding no function word it knows, and
+     * "well done bro" is exactly that: English, and skipped. Sending it out lets the
+     * service work out the language itself, and a translation that comes back identical
+     * to the original is dropped before it reaches the chat, so a French line costs one
+     * request and changes nothing.
+     *
+     * <p>Five letters, so that "?", "4" and "+" do not each become a request.
+     */
+    private static boolean worthTrying(String text) {
+        int letters = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (Character.isLetter(text.charAt(i))) {
+                letters++;
+            }
+        }
+        return letters >= 5;
     }
 
     private void remember(String language) {

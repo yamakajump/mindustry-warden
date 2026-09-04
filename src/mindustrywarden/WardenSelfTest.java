@@ -255,6 +255,20 @@ final class WardenSelfTest {
         // (ChatFragment: "if(!net.active() && messages.size > 0) clearMessages()"), so in
         // single player a line does not survive to the next frame. On a server, which is
         // the only place this feature runs, it does.
+        // Game icons, which nearly half of one evening's messages carried. They are
+        // characters from the icon font's Unicode ranges, and left in they made the
+        // translator answer 500 or hand back French with an icon welded to it.
+        var iconed = mindustrywarden.tools.ChatTranslation.spoken(
+            "[coral][X][]: \u043e\u043f\u044f\u0442\u044c\u1000\u0FB7");
+        check("icons are stripped (" + iconed + ")", "\u043e\u043f\u044f\u0442\u044c".equals(iconed));
+
+        var englishIconed = mindustrywarden.tools.ChatTranslation.spoken(
+            "[coral][X][]: well done bro\u0FC7\u1066");
+        check("and the words survive (" + englishIconed + ")",
+            "well done bro".equals(englishIconed));
+        check("which is now recognised as english (" + guess.of("well done bro") + ")",
+            "en".equals(guess.of("well done bro")));
+
         check("the chat can be read", chat.canRead());
         chat.enabled(true);
 
