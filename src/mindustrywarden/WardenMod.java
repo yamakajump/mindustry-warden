@@ -9,6 +9,7 @@ import mindustry.game.EventType.ClientLoadEvent;
 import mindustry.game.EventType.Trigger;
 import mindustry.mod.Mod;
 import mindustrywarden.tools.GameSpeed;
+import mindustrywarden.tools.Snapshots;
 import mindustrywarden.tools.UnitTuning;
 
 /**
@@ -25,6 +26,9 @@ public class WardenMod extends Mod {
     /** Kept for the same reason: movement speed has to be written every tick. */
     private final UnitTuning tuning = new UnitTuning();
 
+    /** Copies the sector on a timer, which is the only real safety net here. */
+    private final Snapshots snapshots = new Snapshots();
+
     /** Keeps one key press from being read once per simulation pass. */
     private final FrameGate keys = new FrameGate();
 
@@ -34,7 +38,7 @@ public class WardenMod extends Mod {
     public void init() {
         Events.on(ClientLoadEvent.class, event -> {
             speed.install();
-            dialog = new WardenDialog(speed, tuning);
+            dialog = new WardenDialog(speed, tuning, snapshots);
             hookUpdate();
             Log.info("[warden] ready, press right shift in a game");
 
@@ -67,6 +71,7 @@ public class WardenMod extends Mod {
             // again as soon as you open the thing that turns it back down.
             speed.update(dialog.isShown());
             tuning.update();
+            snapshots.update();
 
             // Once per frame, not once per pass. Fast forward runs the world several
             // times per frame and this listener with it, while keyTap stays true for the

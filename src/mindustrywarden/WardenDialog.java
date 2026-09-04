@@ -1,8 +1,10 @@
 package mindustrywarden;
 
+import arc.files.Fi;
 import arc.scene.style.TextureRegionDrawable;
 import arc.scene.ui.layout.Table;
 import arc.struct.ObjectSet;
+import arc.struct.Seq;
 import mindustry.Vars;
 import mindustry.game.Team;
 import mindustry.gen.Icon;
@@ -16,6 +18,7 @@ import mindustrywarden.tools.BasePlans;
 import mindustrywarden.tools.GameSpeed;
 import mindustrywarden.tools.Invulnerability;
 import mindustrywarden.tools.Rubble;
+import mindustrywarden.tools.Snapshots;
 import mindustrywarden.tools.SectorCapture;
 import mindustrywarden.tools.Supplies;
 import mindustrywarden.tools.UnitSpawner;
@@ -39,6 +42,7 @@ public class WardenDialog extends BaseDialog {
     private enum Tab {
         capture("Capture", Icon.modeAttack),
         recover("Recover", Icon.hammer),
+        snapshots("Backups", Icon.save),
         units("Units", Icon.units),
         supplies("Supplies", Icon.box),
         speed("Speed", Icon.waves);
@@ -52,13 +56,14 @@ public class WardenDialog extends BaseDialog {
         }
     }
 
-    private static final float panelWidth = 620f;
+    private static final float panelWidth = 700f;
     private static final float unitIcon = 48f;
     private static final int unitsPerRow = 9;
 
     private final SectorCapture capture = new SectorCapture();
     private final BasePlans basePlans = new BasePlans();
     private final Rubble rubble = new Rubble();
+    private final Snapshots snapshots;
     private final UnitSpawner spawner = new UnitSpawner();
     private final Supplies supplies = new Supplies();
     private final Invulnerability invulnerability = new Invulnerability();
@@ -76,10 +81,11 @@ public class WardenDialog extends BaseDialog {
     private Team unitTeam;
     private int unitCount = 1;
 
-    public WardenDialog(GameSpeed speed, UnitTuning tuning) {
+    public WardenDialog(GameSpeed speed, UnitTuning tuning, Snapshots snapshots) {
         super("Warden");
         this.speed = speed;
         this.tuning = tuning;
+        this.snapshots = snapshots;
         addCloseButton();
     }
 
@@ -97,9 +103,9 @@ public class WardenDialog extends BaseDialog {
                 tabs.button(candidate.title, candidate.icon, Styles.flatTogglet, Vars.iconMed, () -> {
                     tab = candidate;
                     rebuild();
-                // Five tabs across the panel width, so the bar cannot outgrow the body
-                // below it and leave the dialog wider than its own content.
-                }).checked(button -> tab == candidate).size(120f, 52f).pad(2f);
+                // Sized so the whole bar fits the panel width: a tab bar wider than its
+                // body leaves the dialog wider than its own content.
+                }).checked(button -> tab == candidate).size(112f, 52f).pad(2f);
             }
         }).padBottom(8f).row();
 
@@ -119,6 +125,7 @@ public class WardenDialog extends BaseDialog {
             switch (tab) {
                 case capture -> buildCapture(body);
                 case recover -> buildRecover(body);
+                case snapshots -> buildSnapshots(body);
                 case units -> buildUnits(body);
                 case supplies -> buildSupplies(body);
                 case speed -> buildSpeed(body);
@@ -270,6 +277,67 @@ public class WardenDialog extends BaseDialog {
                 ? "Nothing to export."
                 : saved.size + " schematics saved, look for \"Recovered base\".", 6f);
         }).size(320f, 54f).row();
+    }
+
+    private void buildSnapshots(Table body) {
+        header(body, "Restore points");
+
+        note(body, "Warden copies this sector on a timer and keeps the last twenty. "
+            + "Recovery can only rebuild what the game remembers being destroyed, which "
+            + "leaves out everything deconstructed or lost while you were away. A copy "
+            + "taken beforehand has no such gap, and is the only thing that ever brings "
+            + "a base back whole.");
+
+        if (!snapshots.available()) {
+            note(body, "Nothing to copy: this works on a sector or a save you are "
+                + "playing, not on a map opened straight from the editor.");
+            return;
+        }
+
+        body.check("Copy automatically", snapshots.automatic(), on -> {
+            snapshots.automatic(on);
+            rebuild();
+        }).left().padBottom(4f).row();
+
+        body.table(rates -> {
+            rates.add("Every").color(Pal.lightishGray).padRight(10f);
+            for (float minutes : Snapshots.intervals) {
+                float value = minutes;
+                rates.button((int) minutes + " min", Styles.togglet, () -> {
+                    snapshots.interval(value);
+                    rebuild();
+                }).checked(button -> snapshots.interval() == value).size(84f, 44f).pad(2f);
+            }
+        }).padBottom(8f).row();
+
+        body.button("Copy now", Icon.save, Styles.defaultt, Vars.iconMed, () -> {
+            snapshots.capture();
+            rebuild();
+            Vars.ui.showInfoFade("Copy taken.", 3f);
+        }).size(240f, 54f).padBottom(12f).row();
+
+        Seq<Fi> copies = snapshots.list();
+        if (copies.isEmpty()) {
+            note(body, "No copies of this sector yet. The first one lands within a few "
+                + "minutes of play, or right now with the button above.");
+            return;
+        }
+
+        header(body, copies.size + " copies, newest first");
+
+        for (Fi copy : copies) {
+            long age = snapshots.minutesOld(copy);
+            body.table(row -> {
+                row.add(age == 0 ? "just now" : age + " min ago").width(150f).left();
+                row.add(copy.length() / 1024 + " kB").color(Pal.lightishGray).width(90f).left();
+                row.button("Restore", Icon.refresh, Styles.defaultt, Vars.iconSmall, () ->
+                    Vars.ui.showConfirm("Go back to this copy? Everything since it is "
+                        + "lost, and this cannot be undone from inside the game.", () -> {
+                            hide();
+                            snapshots.restore(copy);
+                        })).size(160f, 46f);
+            }).padBottom(4f).row();
+        }
     }
 
     private void buildUnits(Table body) {

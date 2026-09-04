@@ -14,6 +14,7 @@ Built against Mindustry **v159.7**.
 | Tab | What it does |
 |---|---|
 | **Capture** | Removes every enemy building and unit, holds the wave timer back, and lets the game declare the win itself, which is what makes a campaign sector count as captured. A live panel shows the win condition and what is still standing in its way. |
+| **Backups** | Copies the sector on a timer and keeps the last twenty, with a one-click return to any of them. This is the only tool here that brings a base back whole: recovery can only rebuild what the game remembers being destroyed. |
 | **Recover** | Brings a griefed base back. The game files every destroyed building of yours, with its configuration, and keeps the list in the save; this clears whatever was built on top of them, queues them all for rebuild, and can export them as schematics to rebuild elsewhere. |
 | **Units** | Spawns any unit, for any team, in batches. |
 | **Supplies** | Fills the core with every item, and unlocks the research tree. |

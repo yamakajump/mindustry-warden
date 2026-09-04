@@ -13,6 +13,7 @@ import mindustry.world.Tile;
 import mindustrywarden.tools.BasePlans;
 import mindustrywarden.tools.GameSpeed;
 import mindustrywarden.tools.Rubble;
+import mindustrywarden.tools.Snapshots;
 import mindustrywarden.tools.SectorCapture;
 import mindustrywarden.tools.Supplies;
 import mindustrywarden.tools.UnitSpawner;
@@ -172,6 +173,15 @@ final class WardenSelfTest {
         plans.clearBlockers(true);
         plans.placeAll();
         check("the restore sequence runs end to end", Vars.player.team().core() != null);
+
+        // Snapshots, which need a save slot to copy: the whole point is a file on disk
+        // taken before the damage, so a test without one proves nothing.
+        Snapshots snapshots = new Snapshots();
+        Vars.control.saves.addSave("warden-selftest");
+        check("a slot to copy from", snapshots.available());
+        check("a copy is taken", snapshots.capture() != null);
+        check("and it is listed", !snapshots.list().isEmpty());
+        check("its age reads as recent", snapshots.minutesOld(snapshots.list().first()) == 0);
 
         Time.run(30f, () -> {
             Log.info(failures == 0
