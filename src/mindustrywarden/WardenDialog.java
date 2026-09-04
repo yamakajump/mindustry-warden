@@ -156,16 +156,6 @@ public class WardenDialog extends BaseDialog {
     private void rebuild() {
         cont.clear();
 
-        if (!HostGuard.allowed()) {
-            cont.table(Tex.pane, warning -> {
-                warning.image(Icon.warning).color(Pal.remove).size(Vars.iconLarge).padRight(12f);
-                warning.add(Vars.state.isGame()
-                    ? Lang.get("guard.client")
-                    : Lang.get("guard.nogame")).wrap().width(Math.min(420f, contentWidth)).color(Pal.lightishGray);
-            }).pad(20f).row();
-            return;
-        }
-
         // Wide enough to lay a section out in rows, narrow enough that the rows reach
         // the far edge: a panel with an empty right third reads as a panel that was cut
         // off, which is what the first attempt at this looked like.

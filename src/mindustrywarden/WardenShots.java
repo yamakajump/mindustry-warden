@@ -33,6 +33,14 @@ final class WardenShots {
     }
 
     void run() {
+        // Without a world the host guard refuses, which is the same state as being a
+        // guest on someone's server: the cheapest way to photograph what a guest sees.
+        if (System.getenv("WARDEN_SHOT_LOCKED") != null) {
+            Log.info("[shots] locked, no world");
+            Core.app.post(() -> shoot(0));
+            return;
+        }
+
         Log.info("[shots] building a world");
 
         Vars.logic.reset();
