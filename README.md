@@ -2,8 +2,10 @@
 
 Host and sandbox tools for Mindustry, behind one key.
 
-Warden acts on the world your game owns: single player, or a game you host. Press **F9**,
-and a panel gives you the four things a host actually needs and the game does not offer.
+Warden acts on the world your game owns: single player, or a game you host. Press **right
+shift**, and a panel gives you the four things a host actually needs and the game does not
+offer. It borrows the game's own icons, styles and colours, so it looks like part of it
+rather than a foreign window.
 
 Built against Mindustry **v159.7**.
 
@@ -11,7 +13,7 @@ Built against Mindustry **v159.7**.
 
 | Tab | What it does |
 |---|---|
-| **Capture** | Removes every enemy building and unit from the map. The game then declares the win itself, which is what makes a campaign sector count as captured. |
+| **Capture** | Removes every enemy building and unit, holds the wave timer back, and lets the game declare the win itself, which is what makes a campaign sector count as captured. A live panel shows the win condition and what is still standing in its way. |
 | **Units** | Spawns any unit, for any team, in batches. |
 | **Supplies** | Fills the core with every item, and unlocks the research tree. |
 | **Speed** | Runs the simulation from 0.25x to 3x, and makes your blocks and units invulnerable. |

@@ -1,8 +1,12 @@
 package mindustrywarden;
 
+import arc.scene.style.TextureRegionDrawable;
 import arc.scene.ui.layout.Table;
 import mindustry.Vars;
 import mindustry.game.Team;
+import mindustry.gen.Icon;
+import mindustry.gen.Tex;
+import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
@@ -15,23 +19,36 @@ import mindustrywarden.tools.UnitSpawner;
 /**
  * The panel, and the only thing in the mod that knows a tool exists.
  *
- * <p>Every tab is rebuilt on each display rather than kept and refreshed. A tool's state
- * can change from outside the panel, a core can be destroyed while it is open, and a
- * rebuild is cheap next to reasoning about which widget is stale.
+ * <p>It borrows the game's own furniture rather than inventing any: {@link Icon} and
+ * {@link Tex} drawables, {@link Styles} button styles, {@link Pal} colours, and the
+ * accent-underlined section headers the game uses in its database and settings dialogs. A
+ * mod panel that invents its own look reads as a foreign object bolted onto the game, and
+ * the game already answers every question this panel had to ask.
+ *
+ * <p>Tabs are rebuilt on each switch rather than kept and refreshed. Tool state changes
+ * from outside the panel, a core can be destroyed while it is open, and a rebuild is cheap
+ * next to reasoning about which widget went stale. What must stay live inside a tab uses a
+ * label bound to a provider, so it follows the game without a rebuild.
  */
 public class WardenDialog extends BaseDialog {
     private enum Tab {
-        capture("Capture"),
-        units("Units"),
-        supplies("Supplies"),
-        speed("Speed");
+        capture("Capture", Icon.modeAttack),
+        units("Units", Icon.units),
+        supplies("Supplies", Icon.box),
+        speed("Speed", Icon.waves);
 
         final String title;
+        final TextureRegionDrawable icon;
 
-        Tab(String title) {
+        Tab(String title, TextureRegionDrawable icon) {
             this.title = title;
+            this.icon = icon;
         }
     }
+
+    private static final float panelWidth = 620f;
+    private static final float unitIcon = 48f;
+    private static final int unitsPerRow = 9;
 
     private final SectorCapture capture = new SectorCapture();
     private final UnitSpawner spawner = new UnitSpawner();
@@ -57,38 +74,67 @@ public class WardenDialog extends BaseDialog {
 
     private void rebuild() {
         cont.clear();
+        cont.top();
 
         cont.table(tabs -> {
             for (Tab candidate : Tab.values()) {
-                tabs.button(candidate.title, Styles.togglet, () -> {
+                tabs.button(candidate.title, candidate.icon, Styles.flatTogglet, Vars.iconMed, () -> {
                     tab = candidate;
                     rebuild();
-                }).checked(button -> tab == candidate).size(130f, 46f).pad(2f);
+                }).checked(button -> tab == candidate).size(150f, 52f).pad(2f);
             }
-        }).row();
+        }).padBottom(8f).row();
 
         if (!HostGuard.allowed()) {
-            cont.add(HostGuard.refusal()).pad(20f).width(520f).wrap().row();
+            cont.table(Tex.pane, warning -> {
+                warning.image(Icon.warning).color(Pal.remove).size(Vars.iconLarge).padRight(10f);
+                warning.add(HostGuard.refusal()).wrap().width(panelWidth - 90f).color(Pal.lightishGray);
+            }).width(panelWidth).pad(10f).row();
             return;
         }
 
         cont.table(body -> {
-            body.defaults().pad(4f);
+            body.top();
+            body.defaults().left();
             switch (tab) {
                 case capture -> buildCapture(body);
                 case units -> buildUnits(body);
                 case supplies -> buildSupplies(body);
                 case speed -> buildSpeed(body);
             }
-        }).pad(12f).width(560f);
+        }).width(panelWidth).pad(4f);
+    }
+
+    /** The game's own section header: accent label over an accent rule. */
+    private static void header(Table table, String text) {
+        table.add(text).color(Pal.accent).left().growX().row();
+        table.image().color(Pal.accent).height(3f).growX().padBottom(8f).row();
+    }
+
+    private static void note(Table table, String text) {
+        table.add(text).wrap().width(panelWidth - 24f).color(Pal.lightishGray).padBottom(8f).row();
     }
 
     private void buildCapture(Table body) {
-        body.add("Removes every enemy building and unit from this map, then lets the game\n"
-            + "declare the win on its own. On a campaign sector that captures it for good.").wrap()
-            .width(520f).row();
+        header(body, "Capture this map");
 
-        body.button("Capture this map", () -> {
+        // Live, because the first version left a player staring at a panel that said the
+        // capture had worked while the game was still waiting on one surviving unit.
+        body.table(Tex.pane, status -> {
+            status.defaults().left().growX().pad(2f);
+            status.label(() -> Vars.state.rules.attackMode
+                ? "Mode: attack, won when the enemy has no core left"
+                : "Mode: waves, won at the winning wave with no enemy alive").row();
+            status.label(() -> "Wave " + Vars.state.wave
+                + (Vars.state.rules.winWave > 0 ? " of " + Vars.state.rules.winWave : "")).row();
+            status.label(() -> Vars.state.enemies + " enemy units alive")
+                .update(label -> label.setColor(Vars.state.enemies > 0 ? Pal.remove : Pal.heal)).row();
+        }).width(panelWidth - 24f).pad(6f).row();
+
+        note(body, "Removes every enemy building and unit, holds the wave timer back, and\n"
+            + "lets the game declare the capture itself on the next tick.");
+
+        body.button("Capture", Icon.modeAttack, Styles.defaultt, Vars.iconMed, () -> {
             SectorCapture.Result result = capture.run();
             if (!result.anythingToDo) {
                 Vars.ui.showInfo("Nothing to remove: no enemy building or unit is left here.");
@@ -96,8 +142,17 @@ public class WardenDialog extends BaseDialog {
             }
             hide();
             Vars.ui.showInfoFade(result.blocks + " buildings and " + result.units
-                + " units removed. The win lands on the next tick.", 6f);
-        }).size(240f, 52f).row();
+                + " units removed.", 5f);
+
+            // A moment later, because the game's check runs on the next tick and the
+            // answer to "why is it not captured" is worth more than silence.
+            arc.util.Time.run(90f, () -> {
+                String blocking = capture.blocking();
+                if (blocking != null) {
+                    Vars.ui.showInfoFade("Not captured yet: " + blocking, 7f);
+                }
+            });
+        }).size(240f, 54f).padTop(4f).row();
     }
 
     private void buildUnits(Table body) {
@@ -108,90 +163,112 @@ public class WardenDialog extends BaseDialog {
             unitTeam = Vars.player.team();
         }
 
-        body.add("Unit").row();
-        body.pane(list -> {
+        header(body, "Spawn units");
+
+        body.table(Tex.pane, selected -> {
+            selected.image(new TextureRegionDrawable(unitType.fullIcon)).size(Vars.iconXLarge).pad(6f);
+            selected.add(unitType.localizedName).color(Pal.accent).padLeft(6f).growX().left();
+        }).width(panelWidth - 24f).pad(6f).row();
+
+        body.pane(grid -> {
+            grid.left();
+            int index = 0;
             for (UnitType type : spawner.types()) {
-                list.button(type.localizedName, Styles.togglet, () -> {
-                    unitType = type;
-                    rebuild();
-                }).checked(button -> unitType == type).width(250f).height(40f).row();
+                grid.button(new TextureRegionDrawable(type.uiIcon), Styles.clearNoneTogglei,
+                    Vars.iconLarge, () -> {
+                        unitType = type;
+                        rebuild();
+                    }).size(unitIcon).checked(button -> unitType == type).tooltip(type.localizedName);
+
+                if (++index % unitsPerRow == 0) {
+                    grid.row();
+                }
             }
-        }).height(220f).width(280f).row();
+        }).height(230f).width(panelWidth - 24f).scrollX(false).padBottom(8f).row();
 
         body.table(teams -> {
-            teams.add("Team").padRight(8f);
+            teams.add("Team").color(Pal.lightishGray).padRight(10f);
             for (Team team : spawner.teams()) {
-                teams.button(team.name, Styles.togglet, () -> {
+                teams.button(Tex.whiteui, Styles.clearNoneTogglei, 28f, () -> {
                     unitTeam = team;
                     rebuild();
-                }).checked(button -> unitTeam == team).width(96f).height(40f).pad(2f);
+                }).size(46f).pad(2f)
+                    .checked(button -> unitTeam == team)
+                    .tooltip(team.name)
+                    .with(button -> button.getStyle().imageUpColor = team.color);
             }
-        }).row();
+        }).padBottom(4f).row();
 
         body.table(counts -> {
-            counts.add("Count").padRight(8f);
+            counts.add("Count").color(Pal.lightishGray).padRight(10f);
             for (int count : new int[]{1, 5, 10, 25}) {
                 int value = count;
                 counts.button(String.valueOf(count), Styles.togglet, () -> {
                     unitCount = value;
                     rebuild();
-                }).checked(button -> unitCount == value).width(64f).height(40f).pad(2f);
+                }).checked(button -> unitCount == value).size(64f, 44f).pad(2f);
             }
-        }).row();
+        }).padBottom(8f).row();
 
-        body.button("Spawn", () -> {
+        body.button("Spawn", Icon.add, Styles.defaultt, Vars.iconMed, () -> {
             int spawned = spawner.spawn(unitType, unitTeam, unitCount);
-            if (spawned < unitCount) {
-                Vars.ui.showInfoFade(spawned + " of " + unitCount
-                    + " spawned. The team is at its unit cap.", 5f);
-            } else {
-                Vars.ui.showInfoFade(spawned + " " + unitType.localizedName + " spawned.", 3f);
-            }
-        }).size(240f, 52f).row();
+            Vars.ui.showInfoFade(spawned < unitCount
+                ? spawned + " of " + unitCount + " spawned, the team is at its unit cap."
+                : spawned + " " + unitType.localizedName + " spawned.", 4f);
+        }).size(240f, 54f).row();
     }
 
     private void buildSupplies(Table body) {
-        body.button("Fill the core", () -> {
+        header(body, "Resources");
+
+        body.button("Fill the core", Icon.box, Styles.defaultt, Vars.iconMed, () -> {
             if (!supplies.hasCore()) {
                 Vars.ui.showInfo("Your team has no core on this map.");
                 return;
             }
-            int filled = supplies.fillCore();
-            Vars.ui.showInfoFade(filled + " item kinds topped up to capacity.", 4f);
-        }).size(240f, 52f).row();
+            Vars.ui.showInfoFade(supplies.fillCore() + " item kinds topped up to capacity.", 4f);
+        }).size(280f, 54f).padBottom(16f).row();
 
-        body.add("Unlocking research is stored on your profile, not in this save: it stays\n"
-            + "unlocked in every campaign afterwards, and there is no undo.").wrap()
-            .width(520f).padTop(12f).row();
+        header(body, "Research");
 
-        body.button("Unlock all research", () ->
-            Vars.ui.showConfirm("Unlock everything in the tech tree, permanently?", () -> {
-                int unlocked = supplies.unlockAll();
-                Vars.ui.showInfoFade(unlocked + " entries unlocked.", 4f);
-            })).size(240f, 52f).row();
+        note(body, "Unlocking is stored on your profile, not in this save: it stays unlocked\n"
+            + "in every campaign afterwards, and there is no undo.");
+
+        body.button("Unlock all research", Icon.tree, Styles.defaultt, Vars.iconMed, () ->
+            Vars.ui.showConfirm("Unlock everything in the tech tree, permanently?", () ->
+                Vars.ui.showInfoFade(supplies.unlockAll() + " entries unlocked.", 4f)))
+            .size(280f, 54f).row();
     }
 
     private void buildSpeed(Table body) {
-        body.add("Speed").row();
+        header(body, "Game speed");
+
         body.table(steps -> {
             for (float step : GameSpeed.steps) {
                 float value = step;
-                steps.button(step + "x", Styles.togglet, () -> {
+                steps.button(label(step), Styles.togglet, () -> {
                     speed.multiplier(value);
                     rebuild();
-                }).checked(button -> speed.multiplier() == value).width(72f).height(40f).pad(2f);
+                }).checked(button -> speed.multiplier() == value).size(76f, 46f).pad(2f);
             }
-        }).row();
+        }).padBottom(6f).row();
 
-        body.add("The game clamps its own step at 3x. Past that, units start crossing walls,\n"
-            + "so there is no button for it.").wrap().width(520f).padBottom(12f).row();
+        note(body, "The game clamps its own step at 3x. Past that units start crossing walls\n"
+            + "between ticks, so there is no button for it.");
 
-        body.check("Invulnerable blocks and units", invulnerability.enabled(), on -> {
+        header(body, "Invulnerability");
+
+        note(body, "A team rule, so it travels with the save. Turn it off before you put the\n"
+            + "game away.");
+
+        body.check("Blocks and units of your team", invulnerability.enabled(), on -> {
             invulnerability.toggle(on);
-            Vars.ui.showInfoFade(on
-                ? "Invulnerable. This is written into the save, so turn it off before you\n"
-                  + "put the game away."
-                : "Back to normal health.", 5f);
-        }).row();
+            Vars.ui.showInfoFade(on ? "Invulnerable." : "Back to normal health.", 3f);
+        }).left().row();
+    }
+
+    /** "1x" rather than "1.0x", which is what the game would print. */
+    private static String label(float step) {
+        return (step == Math.rint(step) ? String.valueOf((int) step) : String.valueOf(step)) + "x";
     }
 }

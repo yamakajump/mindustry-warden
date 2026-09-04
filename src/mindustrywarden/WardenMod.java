@@ -29,12 +29,15 @@ public class WardenMod extends Mod {
             speed.install();
             dialog = new WardenDialog(speed);
             bindKey();
-            Log.info("[warden] ready, press F9 in a game");
+            Log.info("[warden] ready, press right shift in a game");
         });
     }
 
     /**
-     * F9 opens and closes the panel.
+     * Right shift opens and closes the panel.
+     *
+     * <p>Right rather than left: the game binds left shift itself, for unit commands and
+     * for the zoom modifier, and a panel that opens mid-command is a panel in the way.
      *
      * <p>Guarded against the chat and the console: both take typed input, and a key that
      * opens a dialog mid-sentence eats the sentence.
@@ -44,7 +47,7 @@ public class WardenMod extends Mod {
             if (Vars.state.isMenu() || Vars.ui.chatfrag.shown() || Vars.ui.consolefrag.shown()) {
                 return;
             }
-            if (!Core.input.keyTap(KeyCode.f9)) {
+            if (!Core.input.keyTap(KeyCode.shiftRight)) {
                 return;
             }
             if (dialog.isShown()) {
