@@ -43,8 +43,13 @@ public final class ChatTranslation {
     /** How many recent lines decide what the room speaks. */
     private static final int memory = 20;
 
-    /** Below this many known lines, the room has not said enough to be called anything. */
-    private static final int enough = 2;
+    /**
+     * How many known lines it takes to name a room.
+     *
+     * <p>One. Waiting for two meant the first thing said after joining went out
+     * untranslated, which is the moment it is most needed.
+     */
+    private static final int enough = 1;
 
     private final Translator translator = new Translator();
     private final LanguageGuess guess = new LanguageGuess();
@@ -91,6 +96,15 @@ public final class ChatTranslation {
 
             String text = spoken(line);
             if (text == null || handled.contains(line)) {
+                return;
+            }
+
+            // Ours, spotted by the name in front of it. The chat event would say so more
+            // cleanly, but it does not fire on a server that formats its own messages,
+            // which is the same reason incoming lines are read from here.
+            if (isMine(line)) {
+                handled.add(line);
+                sendTranslation(text);
                 return;
             }
 
@@ -169,6 +183,26 @@ public final class ChatTranslation {
         return out.toString();
     }
 
+    /**
+     * Whether a chat line is one of ours.
+     *
+     * <p>By the name in front of the "]:", with colour tags removed from both sides: a
+     * player name carries its own colours and the chat adds more around it.
+     */
+    private static boolean isMine(String line) {
+        if (Vars.player == null) {
+            return false;
+        }
+        int mark = line.lastIndexOf("]:");
+        if (mark < 0) {
+            return false;
+        }
+
+        String header = withoutTags(line.substring(0, mark));
+        String me = withoutTags(Vars.player.name).trim();
+        return !me.isEmpty() && header.contains(me);
+    }
+
     private void remember(String language) {
         if (language == null || language.equals(mine())) {
             return;
@@ -236,15 +270,36 @@ public final class ChatTranslation {
     }
 
     private void sendTranslation(String message) {
-        if (!enabled() || message.equals(lastSent)) {
+        if (!enabled()) {
             return;
         }
-        String room = roomLanguage();
-        if (room == null || room.equals(mine())) {
+        if (message.equals(lastSent)) {
+            // Our own translation coming back around, not something new to send.
             return;
         }
 
+        String room = roomLanguage();
+        if (room == null) {
+            Log.info("[warden] not sending a translation: the room has said nothing yet");
+            return;
+        }
+        if (room.equals(mine())) {
+            return;
+        }
+
+        // Only lines in our own language go out translated. This is what stops the loop:
+        // a translation we sent comes back as one of our messages, already in the room's
+        // language, and would otherwise be sent again, and again. Comparing against the
+        // last text sent is not enough on its own, since a server free to add a prefix
+        // makes the returning line different from the one that left.
+        String language = guess.of(message);
+        if (language != null && !language.equals(mine())) {
+            return;
+        }
+
+        Log.info("[warden] mine, @ -> @: @", mine(), room, message);
         translator.translate(message, mine(), room, translated -> Core.app.post(() -> {
+            Log.info("[warden] sending: @", translated);
             lastSent = translated;
             Call.sendChatMessage(translated);
         }));
