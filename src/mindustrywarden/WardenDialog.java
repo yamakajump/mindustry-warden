@@ -18,6 +18,7 @@ import mindustrywarden.tools.Invulnerability;
 import mindustrywarden.tools.SectorCapture;
 import mindustrywarden.tools.Supplies;
 import mindustrywarden.tools.UnitSpawner;
+import mindustrywarden.tools.UnitTuning;
 
 /**
  * The panel, and the only thing in the mod that knows a tool exists.
@@ -60,6 +61,7 @@ public class WardenDialog extends BaseDialog {
     private final Supplies supplies = new Supplies();
     private final Invulnerability invulnerability = new Invulnerability();
     private final GameSpeed speed;
+    private final UnitTuning tuning;
 
     private Tab tab = Tab.capture;
     /** Off by default: clearing your own blocks is the rarer, more destructive intent. */
@@ -72,9 +74,10 @@ public class WardenDialog extends BaseDialog {
     private Team unitTeam;
     private int unitCount = 1;
 
-    public WardenDialog(GameSpeed speed) {
+    public WardenDialog(GameSpeed speed, UnitTuning tuning) {
         super("Warden");
         this.speed = speed;
+        this.tuning = tuning;
         addCloseButton();
     }
 
@@ -106,7 +109,9 @@ public class WardenDialog extends BaseDialog {
             return;
         }
 
-        cont.table(body -> {
+        // One scroll for the whole body rather than one per grid: a tab taller than the
+        // screen is normal here, and nested scroll areas fight each other under a wheel.
+        cont.pane(body -> {
             body.top();
             body.defaults().left();
             switch (tab) {
@@ -116,7 +121,7 @@ public class WardenDialog extends BaseDialog {
                 case supplies -> buildSupplies(body);
                 case speed -> buildSpeed(body);
             }
-        }).width(panelWidth).pad(4f);
+        }).width(panelWidth).maxHeight(560f).scrollX(false).pad(4f);
     }
 
     /** The game's own section header: accent label over an accent rule. */
@@ -247,7 +252,7 @@ public class WardenDialog extends BaseDialog {
             selected.add(unitType.localizedName).color(Pal.accent).padLeft(6f).growX().left();
         }).width(panelWidth - 24f).pad(6f).row();
 
-        body.pane(grid -> {
+        body.table(grid -> {
             grid.left();
             int index = 0;
             for (UnitType type : spawner.types()) {
@@ -261,7 +266,7 @@ public class WardenDialog extends BaseDialog {
                     grid.row();
                 }
             }
-        }).height(230f).width(panelWidth - 24f).scrollX(false).padBottom(8f).row();
+        }).width(panelWidth - 24f).padBottom(8f).row();
 
         body.table(teams -> {
             teams.add("Team").color(Pal.lightishGray).padRight(10f);
@@ -379,17 +384,65 @@ public class WardenDialog extends BaseDialog {
         header(body, "Game speed");
 
         body.table(steps -> {
+            int index = 0;
             for (float step : GameSpeed.steps) {
                 float value = step;
                 steps.button(label(step), Styles.togglet, () -> {
                     speed.multiplier(value);
                     rebuild();
                 }).checked(button -> speed.multiplier() == value).size(76f, 46f).pad(2f);
+
+                if (++index % 5 == 0) {
+                    steps.row();
+                }
             }
         }).padBottom(6f).row();
 
-        note(body, "The game clamps its own step at 3x. Past that units start crossing walls\n"
-            + "between ticks, so there is no button for it.");
+        note(body, "Everything moves: units, conveyors, waves, you. Above 1x the world is run\n"
+            + "several times per frame rather than in bigger steps, so the simulation stays\n"
+            + "exact and it is the frame rate that pays. Expect a slideshow at 32x and 64x\n"
+            + "on a large map. It ends when you come back down.");
+
+        header(body, "Your movement speed");
+
+        note(body, "This one is yours alone, and does not touch the speed of the game.");
+
+        body.table(steps -> {
+            for (float step : UnitTuning.steps) {
+                float value = step;
+                steps.button(label(step), Styles.togglet, () -> {
+                    tuning.unitSpeed(value);
+                    rebuild();
+                }).checked(button -> tuning.unitSpeed() == value).size(76f, 46f).pad(2f);
+            }
+        }).padBottom(4f).row();
+
+        body.check("Every unit of my team, not just mine", tuning.wholeTeam(),
+            tuning::wholeTeam).left().padBottom(16f).row();
+
+        header(body, "Building and mining");
+
+        body.table(rates -> {
+            rates.add("Build").color(Pal.lightishGray).padRight(10f);
+            for (float step : UnitTuning.steps) {
+                float value = step;
+                rates.button(label(step), Styles.togglet, () -> {
+                    tuning.buildSpeed(value);
+                    rebuild();
+                }).checked(button -> tuning.buildSpeed() == value).size(70f, 44f).pad(2f);
+            }
+        }).row();
+
+        body.table(rates -> {
+            rates.add("Mine").color(Pal.lightishGray).padRight(10f);
+            for (float step : UnitTuning.steps) {
+                float value = step;
+                rates.button(label(step), Styles.togglet, () -> {
+                    tuning.mineSpeed(value);
+                    rebuild();
+                }).checked(button -> tuning.mineSpeed() == value).size(70f, 44f).pad(2f);
+            }
+        }).padBottom(16f).row();
 
         header(body, "Invulnerability");
 

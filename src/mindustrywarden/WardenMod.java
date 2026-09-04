@@ -9,6 +9,7 @@ import mindustry.game.EventType.ClientLoadEvent;
 import mindustry.game.EventType.Trigger;
 import mindustry.mod.Mod;
 import mindustrywarden.tools.GameSpeed;
+import mindustrywarden.tools.UnitTuning;
 
 /**
  * Host and sandbox tools for Mindustry, behind one key.
@@ -21,14 +22,17 @@ public class WardenMod extends Mod {
     /** Installed at startup and kept, because it owns the game clock for the session. */
     private final GameSpeed speed = new GameSpeed();
 
+    /** Kept for the same reason: movement speed has to be written every tick. */
+    private final UnitTuning tuning = new UnitTuning();
+
     private WardenDialog dialog;
 
     @Override
     public void init() {
         Events.on(ClientLoadEvent.class, event -> {
             speed.install();
-            dialog = new WardenDialog(speed);
-            bindKey();
+            dialog = new WardenDialog(speed, tuning);
+            hookUpdate();
             Log.info("[warden] ready, press right shift in a game");
         });
     }
@@ -42,8 +46,13 @@ public class WardenMod extends Mod {
      * <p>Guarded against the chat and the console: both take typed input, and a key that
      * opens a dialog mid-sentence eats the sentence.
      */
-    private void bindKey() {
+    private void hookUpdate() {
         Events.run(Trigger.update, () -> {
+            // Before the key handling and its early returns: both of these have to run on
+            // every frame, whatever the panel and the chat are doing.
+            speed.update();
+            tuning.update();
+
             if (Vars.state.isMenu() || Vars.ui.chatfrag.shown() || Vars.ui.consolefrag.shown()) {
                 return;
             }
