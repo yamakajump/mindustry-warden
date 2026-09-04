@@ -41,6 +41,9 @@ public class WardenMod extends Mod {
             if (WardenSelfTest.requested()) {
                 new WardenSelfTest(speed, tuning).run();
             }
+            if (WardenInspect.requested()) {
+                new WardenInspect().run();
+            }
         });
     }
 

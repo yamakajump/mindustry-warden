@@ -12,6 +12,7 @@ import mindustry.type.Item;
 import mindustry.world.Tile;
 import mindustrywarden.tools.BasePlans;
 import mindustrywarden.tools.GameSpeed;
+import mindustrywarden.tools.Rubble;
 import mindustrywarden.tools.SectorCapture;
 import mindustrywarden.tools.Supplies;
 import mindustrywarden.tools.UnitSpawner;
@@ -152,11 +153,21 @@ final class WardenSelfTest {
         check("the enemy core was removed (" + result.blocks + " blocks)", result.blocks > 0);
         check("the player core survived", Vars.player.team().core() != null);
 
+        // Rubble, which nothing else touches: an eradicated base does not leave the map,
+        // it changes hands to derelict and stays standing.
+        Vars.world.tile(40, 40).setBlock(Blocks.titaniumWall, Team.derelict, 0);
+        // A tick, because an entity group holds new members in a queue until it updates.
+        Vars.logic.update();
+        Rubble rubble = new Rubble();
+        check("rubble is counted (" + rubble.count() + ")", rubble.count() > 0);
+        check("rubble is removed", rubble.clear() > 0 && rubble.count() == 0);
+
         // The whole restore sequence, in the order the single button runs it. Mostly a
-        // guard against a class going missing from one of the three, which is what a
+        // guard against a class going missing from one of the four, which is what a
         // hot-swapped jar did to a live game.
         Vars.world.tile(30, 30).setBlock(Blocks.copperWall, Team.crux, 0);
         capture.run();
+        rubble.clear();
         plans.clearBlockers(true);
         plans.placeAll();
         check("the restore sequence runs end to end", Vars.player.team().core() != null);

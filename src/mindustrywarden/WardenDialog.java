@@ -15,6 +15,7 @@ import mindustry.ui.dialogs.BaseDialog;
 import mindustrywarden.tools.BasePlans;
 import mindustrywarden.tools.GameSpeed;
 import mindustrywarden.tools.Invulnerability;
+import mindustrywarden.tools.Rubble;
 import mindustrywarden.tools.SectorCapture;
 import mindustrywarden.tools.Supplies;
 import mindustrywarden.tools.UnitSpawner;
@@ -57,6 +58,7 @@ public class WardenDialog extends BaseDialog {
 
     private final SectorCapture capture = new SectorCapture();
     private final BasePlans basePlans = new BasePlans();
+    private final Rubble rubble = new Rubble();
     private final UnitSpawner spawner = new UnitSpawner();
     private final Supplies supplies = new Supplies();
     private final Invulnerability invulnerability = new Invulnerability();
@@ -194,17 +196,30 @@ public class WardenDialog extends BaseDialog {
         // The one button, because the three below it are almost always used in the same
         // order and getting that order wrong leaves plans buried under something.
         body.button("Restore everything", Icon.refresh, Styles.defaultt, Vars.iconMed, () ->
-            Vars.ui.showConfirm("Remove the enemy base and your own launch loadout, then "
-                + "put every remembered block back where it was?", () -> {
+            Vars.ui.showConfirm("Remove the enemy base, the derelict rubble and your own "
+                + "launch loadout, then put every remembered block back where it was?", () -> {
                     SectorCapture.Result removed = capture.run();
+                    int rubbleGone = rubble.clear();
                     int cleared = basePlans.clearBlockers(true);
                     int placed = basePlans.placeAll();
                     hide();
                     Vars.ui.showInfoFade(placed + " blocks restored, after clearing "
-                        + (removed.blocks + cleared) + " that were in the way.", 7f);
+                        + (removed.blocks + rubbleGone + cleared) + " that were in the way.", 7f);
                 })).size(320f, 60f).padBottom(10f).row();
 
         note(body, "Step by step, if you would rather see each stage:");
+
+        // Counted at build time rather than bound to a provider: the button label takes a
+        // string, and counting every building on a 480x480 map is not free enough to do
+        // it on every frame.
+        body.button("Clear derelict rubble (" + rubble.count() + " blocks)",
+            Icon.trash, Styles.defaultt, Vars.iconMed, () -> {
+                int gone = rubble.clear();
+                hide();
+                Vars.ui.showInfoFade(gone == 0
+                    ? "No rubble on this map."
+                    : gone + " derelict blocks removed.", 5f);
+            }).size(360f, 54f).padBottom(4f).row();
 
         body.button("1. Clear what covers them", Icon.eraser, Styles.defaultt, Vars.iconMed, () -> {
             int cleared = basePlans.clearBlockers(clearOwn);
