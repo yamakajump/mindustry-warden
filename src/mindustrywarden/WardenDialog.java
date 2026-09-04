@@ -1,7 +1,9 @@
 package mindustrywarden;
 
+import arc.Core;
 import arc.files.Fi;
 import arc.scene.style.TextureRegionDrawable;
+import arc.scene.ui.layout.Scl;
 import arc.scene.ui.layout.Table;
 import arc.struct.ObjectSet;
 import arc.struct.Seq;
@@ -18,8 +20,8 @@ import mindustrywarden.tools.BasePlans;
 import mindustrywarden.tools.GameSpeed;
 import mindustrywarden.tools.Invulnerability;
 import mindustrywarden.tools.Rubble;
-import mindustrywarden.tools.Snapshots;
 import mindustrywarden.tools.SectorCapture;
+import mindustrywarden.tools.Snapshots;
 import mindustrywarden.tools.Supplies;
 import mindustrywarden.tools.UnitSpawner;
 import mindustrywarden.tools.UnitTuning;
@@ -27,38 +29,43 @@ import mindustrywarden.tools.UnitTuning;
 /**
  * The panel, and the only thing in the mod that knows a tool exists.
  *
- * <p>It borrows the game's own furniture rather than inventing any: {@link Icon} and
- * {@link Tex} drawables, {@link Styles} button styles, {@link Pal} colours, and the
- * accent-underlined section headers the game uses in its database and settings dialogs. A
- * mod panel that invents its own look reads as a foreign object bolted onto the game, and
- * the game already answers every question this panel had to ask.
+ * <p>Laid out like the game's own settings dialog: a menu down the left, the section on
+ * the right, sized against the screen rather than to a fixed width. The first version was
+ * a 700 pixel column on a 2000 pixel screen, most of it paragraphs, and paragraphs are
+ * what a panel writes when it has not decided what it is for.
  *
- * <p>Tabs are rebuilt on each switch rather than kept and refreshed. Tool state changes
- * from outside the panel, a core can be destroyed while it is open, and a rebuild is cheap
- * next to reasoning about which widget went stale. What must stay live inside a tab uses a
- * label bound to a provider, so it follows the game without a rebuild.
+ * <p>So the numbers do the talking. Each section opens with cards holding one figure and
+ * one word, explanations live in tooltips, and every section has exactly one button that
+ * matters with the rest kept smaller underneath. Wording comes from {@link Lang}, French
+ * or English.
+ *
+ * <p>Sections are rebuilt on each switch rather than kept and refreshed. Tool state
+ * changes from outside the panel, a core can be destroyed while it is open, and a rebuild
+ * is cheap next to reasoning about which widget went stale.
  */
 public class WardenDialog extends BaseDialog {
     private enum Tab {
-        capture("Capture", Icon.modeAttack),
-        recover("Recover", Icon.hammer),
-        snapshots("Backups", Icon.save),
-        units("Units", Icon.units),
-        supplies("Supplies", Icon.box),
-        speed("Speed", Icon.waves);
+        capture("tab.capture", Icon.modeAttack),
+        recover("tab.recover", Icon.hammer),
+        backups("tab.backups", Icon.save),
+        units("tab.units", Icon.units),
+        supplies("tab.supplies", Icon.box),
+        speed("tab.speed", Icon.waves),
+        settings("tab.settings", Icon.settings);
 
-        final String title;
+        final String key;
         final TextureRegionDrawable icon;
 
-        Tab(String title, TextureRegionDrawable icon) {
-            this.title = title;
+        Tab(String key, TextureRegionDrawable icon) {
+            this.key = key;
             this.icon = icon;
         }
     }
 
-    private static final float panelWidth = 700f;
-    private static final float unitIcon = 48f;
-    private static final int unitsPerRow = 9;
+    private static final float menuWidth = 230f;
+    private static final float cardWidth = 190f;
+    private static final float cardHeight = 100f;
+    private static final float mainButton = 430f;
 
     private final SectorCapture capture = new SectorCapture();
     private final BasePlans basePlans = new BasePlans();
@@ -70,23 +77,24 @@ public class WardenDialog extends BaseDialog {
     private final GameSpeed speed;
     private final UnitTuning tuning;
 
-    private Tab tab = Tab.capture;
-    /** Off by default: clearing your own blocks is the rarer, more destructive intent. */
+    private Tab tab = Tab.recover;
     private boolean clearOwn;
-    /** Off by default: a Serpulo core has no use for carbide, and it only gets in the way. */
     private boolean allPlanets;
     private final ObjectSet<Item> selectedItems = new ObjectSet<>();
-    private int giveAmount = 1000;
+    private int amount = 1000;
     private UnitType unitType;
     private Team unitTeam;
     private int unitCount = 1;
 
     public WardenDialog(GameSpeed speed, UnitTuning tuning, Snapshots snapshots) {
-        super("Warden");
+        super(Lang.get("title"));
         this.speed = speed;
         this.tuning = tuning;
         this.snapshots = snapshots;
         addCloseButton();
+
+        // Sized against the screen, so a window resize has to rebuild it.
+        resized(this::rebuild);
     }
 
     public void open() {
@@ -94,253 +102,251 @@ public class WardenDialog extends BaseDialog {
         show();
     }
 
+    /** How many sections there are, for the screenshot pass. */
+    int tabCount() {
+        return Tab.values().length;
+    }
+
+    /** The section's own key, which doubles as a file name. */
+    String tabName(int index) {
+        return Tab.values()[index].name();
+    }
+
+    /** Open one section directly, which only the screenshot pass needs. */
+    void openTab(int index) {
+        tab = Tab.values()[index];
+        rebuild();
+        if (!isShown()) {
+            show();
+        }
+    }
+
     private void rebuild() {
         cont.clear();
-        cont.top();
-
-        cont.table(tabs -> {
-            for (Tab candidate : Tab.values()) {
-                tabs.button(candidate.title, candidate.icon, Styles.flatTogglet, Vars.iconMed, () -> {
-                    tab = candidate;
-                    rebuild();
-                // Sized so the whole bar fits the panel width: a tab bar wider than its
-                // body leaves the dialog wider than its own content.
-                }).checked(button -> tab == candidate).size(112f, 52f).pad(2f);
-            }
-        }).padBottom(8f).row();
 
         if (!HostGuard.allowed()) {
             cont.table(Tex.pane, warning -> {
-                warning.image(Icon.warning).color(Pal.remove).size(Vars.iconLarge).padRight(10f);
-                warning.add(HostGuard.refusal()).wrap().width(panelWidth - 120f).color(Pal.lightishGray);
-            }).width(panelWidth).pad(10f).row();
+                warning.image(Icon.warning).color(Pal.remove).size(Vars.iconLarge).padRight(12f);
+                warning.add(Vars.state.isGame()
+                    ? Lang.get("guard.client")
+                    : Lang.get("guard.nogame")).wrap().width(420f).color(Pal.lightishGray);
+            }).pad(20f).row();
             return;
         }
 
-        // One scroll for the whole body rather than one per grid: a tab taller than the
-        // screen is normal here, and nested scroll areas fight each other under a wheel.
-        cont.pane(body -> {
-            body.top();
-            body.defaults().left();
-            switch (tab) {
-                case capture -> buildCapture(body);
-                case recover -> buildRecover(body);
-                case snapshots -> buildSnapshots(body);
-                case units -> buildUnits(body);
-                case supplies -> buildSupplies(body);
-                case speed -> buildSpeed(body);
-            }
-        }).width(panelWidth).maxHeight(560f).scrollX(false).pad(4f);
+        // Wide enough to lay a section out in rows, narrow enough that the rows reach
+        // the far edge: a panel with an empty right third reads as a panel that was cut
+        // off, which is what the first attempt at this looked like.
+        float width = Math.min(Core.graphics.getWidth() / Scl.scl(1f) * 0.52f, 980f);
+        float height = Math.min(Core.graphics.getHeight() / Scl.scl(1f) * 0.7f, 880f);
+
+        cont.table(root -> {
+            root.table(Tex.pane, menu -> {
+                menu.top();
+                for (Tab candidate : Tab.values()) {
+                    menu.button(Lang.get(candidate.key), candidate.icon, Styles.flatTogglet,
+                        Vars.iconMed, () -> {
+                            tab = candidate;
+                            rebuild();
+                        }).checked(button -> tab == candidate)
+                        .size(menuWidth - 20f, 58f).pad(3f).row();
+                }
+            }).width(menuWidth).growY().padRight(8f);
+
+            root.pane(body -> {
+                body.top().left();
+                body.defaults().left();
+                switch (tab) {
+                    case capture -> buildCapture(body);
+                    case recover -> buildRecover(body);
+                    case backups -> buildBackups(body);
+                    case units -> buildUnits(body);
+                    case supplies -> buildSupplies(body);
+                    case speed -> buildSpeed(body);
+                    case settings -> buildSettings(body);
+                }
+            }).scrollX(false).grow().pad(4f);
+        }).width(width).maxHeight(height);
     }
 
-    /** The game's own section header: accent label over an accent rule. */
-    private static void header(Table table, String text) {
-        table.add(text).color(Pal.accent).left().growX().row();
-        table.image().color(Pal.accent).height(3f).growX().padBottom(8f).row();
+    /** One figure, one word. What a paragraph was trying to say. */
+    private void card(Table table, Object value, String labelKey, boolean warn) {
+        table.table(Tex.pane, card -> {
+            card.add(String.valueOf(value)).style(Styles.outlineLabel).fontScale(1.7f)
+                .color(warn ? Pal.remove : Pal.accent).row();
+            card.add(Lang.get(labelKey)).color(Pal.lightishGray);
+        }).size(cardWidth, cardHeight).pad(5f);
     }
 
-    private static void note(Table table, String text) {
-        table.add(text).wrap().width(panelWidth - 60f).color(Pal.lightishGray).padBottom(8f).row();
+    private void title(Table table, String key) {
+        table.add(Lang.get(key)).color(Pal.accent).left().growX().padTop(4f).row();
+        table.image().color(Pal.accent).height(3f).growX().padBottom(10f).row();
     }
 
     private void buildCapture(Table body) {
-        header(body, "Capture this map");
+        title(body, "tab.capture");
 
-        // Live, because the first version left a player staring at a panel that said the
-        // capture had worked while the game was still waiting on one surviving unit.
-        body.table(Tex.pane, status -> {
-            status.defaults().left().growX().pad(2f);
-            status.label(() -> Vars.state.rules.attackMode
-                ? "Mode: attack, won when the enemy has no core left"
-                : "Mode: waves, won at the winning wave with no enemy alive").row();
-            status.label(() -> "Wave " + Vars.state.wave
-                + (Vars.state.rules.winWave > 0 ? " of " + Vars.state.rules.winWave : "")).row();
-            status.label(() -> Vars.state.enemies + " enemy units alive")
-                .update(label -> label.setColor(Vars.state.enemies > 0 ? Pal.remove : Pal.heal)).row();
-        }).width(panelWidth - 24f).pad(6f).row();
+        body.table(cards -> {
+            cards.left();
+            card(cards, Lang.get(Vars.state.rules.attackMode
+                ? "capture.mode.attack" : "capture.mode.waves"), "tab.capture", false);
+            card(cards, Vars.state.wave
+                + (Vars.state.rules.winWave > 0 ? "/" + Vars.state.rules.winWave : ""),
+                "capture.wave", false);
+            card(cards, Vars.state.enemies, "capture.enemies", Vars.state.enemies > 0);
+        }).padBottom(12f).row();
 
-        note(body, "Removes every enemy building and unit, holds the wave timer back, and "
-            + "lets the game declare the capture itself on the next tick.");
-
-        body.button("Capture", Icon.modeAttack, Styles.defaultt, Vars.iconMed, () -> {
+        body.button(Lang.get("capture.do"), Icon.modeAttack, Styles.defaultt, Vars.iconLarge, () -> {
             SectorCapture.Result result = capture.run();
             if (!result.anythingToDo) {
-                Vars.ui.showInfo("Nothing to remove: no enemy building or unit is left here.");
+                Vars.ui.showInfo(Lang.get("capture.nothing"));
                 return;
             }
             hide();
-            Vars.ui.showInfoFade(result.blocks + " buildings and " + result.units
-                + " units removed.", 5f);
-
-            // A moment later, because the game's check runs on the next tick and the
-            // answer to "why is it not captured" is worth more than silence.
+            Vars.ui.showInfoFade(Lang.get("capture.done", result.blocks, result.units), 5f);
             arc.util.Time.run(90f, () -> {
                 String blocking = capture.blocking();
                 if (blocking != null) {
-                    Vars.ui.showInfoFade("Not captured yet: " + blocking, 7f);
+                    Vars.ui.showInfoFade(Lang.get("capture.blocked", blocking), 7f);
                 }
             });
-        }).size(240f, 54f).padTop(4f).row();
+        }).size(mainButton, 70f).tooltip(Lang.get("capture.hint")).row();
     }
 
     private void buildRecover(Table body) {
-        header(body, "Recover your destroyed base");
+        title(body, "tab.recover");
 
-        body.table(Tex.pane, status -> {
-            status.defaults().left().growX().pad(2f);
-            status.label(() -> basePlans.plans().size + " destroyed blocks remembered")
-                .update(label -> label.setColor(basePlans.plans().isEmpty() ? Pal.lightishGray : Pal.accent))
-                .row();
-        }).width(panelWidth - 24f).pad(6f).row();
+        int plans = basePlans.plans().size;
+        int rubbleCount = rubble.count();
 
-        note(body, "The game files every building of yours that dies, with its position and "
-            + "its configuration, and keeps the list in the save. Clear what was built "
-            + "on top of them first: a plan under an occupied tile queues fine and then "
-            + "never builds. The starter base the game drops when you launch counts as "
-            + "covering, which is what the second option is for. Cores are never "
-            + "removed.");
+        body.table(cards -> {
+            cards.left();
+            card(cards, plans, "recover.plans", plans > 0);
+            card(cards, rubbleCount, "recover.rubble", rubbleCount > 0);
+        }).padBottom(12f).row();
 
-        // The one button, because the three below it are almost always used in the same
-        // order and getting that order wrong leaves plans buried under something.
-        body.button("Restore everything", Icon.refresh, Styles.defaultt, Vars.iconMed, () ->
-            Vars.ui.showConfirm("Remove the enemy base, the derelict rubble and your own "
-                + "launch loadout, then put every remembered block back where it was?", () -> {
-                    SectorCapture.Result removed = capture.run();
-                    int rubbleGone = rubble.clear();
-                    // Before placing, not after: blocks put back into a burning sector
-                    // are lost faster than they land.
-                    int fires = rubble.extinguish();
-                    int cleared = basePlans.clearBlockers(true);
-                    int placed = basePlans.placeAll();
-                    hide();
-                    Vars.ui.showInfoFade(placed + " blocks restored, after clearing "
-                        + (removed.blocks + rubbleGone + cleared) + " that were in the way"
-                        + (fires > 0 ? " and putting out " + fires + " fires." : "."), 7f);
-                })).size(320f, 60f).padBottom(10f).row();
-
-        note(body, "Step by step, if you would rather see each stage:");
-
-        // Counted at build time rather than bound to a provider: the button label takes a
-        // string, and counting every building on a 480x480 map is not free enough to do
-        // it on every frame.
-        body.button("Clear derelict rubble (" + rubble.count() + " blocks)",
-            Icon.trash, Styles.defaultt, Vars.iconMed, () -> {
-                int gone = rubble.clear();
+        body.button(Lang.get("recover.all"), Icon.refresh, Styles.defaultt, Vars.iconLarge, () ->
+            Vars.ui.showConfirm(Lang.get("recover.all.confirm"), () -> {
+                SectorCapture.Result removed = capture.run();
+                int rubbleGone = rubble.clear();
+                int fires = rubble.extinguish();
+                int cleared = basePlans.clearBlockers(true);
+                int placed = basePlans.placeAll();
                 hide();
-                Vars.ui.showInfoFade(gone == 0
-                    ? "No rubble on this map."
-                    : gone + " derelict blocks removed.", 5f);
-            }).size(360f, 54f).padBottom(4f).row();
+                Vars.ui.showInfoFade(Lang.get("recover.all.done", placed,
+                    removed.blocks + rubbleGone + fires + cleared), 7f);
+            })).size(mainButton, 70f).tooltip(Lang.get("recover.all.hint")).padBottom(14f).row();
 
-        body.button("1. Clear what covers them", Icon.eraser, Styles.defaultt, Vars.iconMed, () -> {
-            int cleared = basePlans.clearBlockers(clearOwn);
-            Vars.ui.showInfoFade(cleared == 0
-                ? "Nothing was standing on your plans."
-                : cleared + " tiles cleared of what was built over your base.", 5f);
-        }).size(320f, 54f).row();
+        body.table(steps -> {
+            steps.left();
+            steps.defaults().size(265f, 56f).pad(4f);
 
-        body.check("Clear my own blocks too, such as the launch loadout", clearOwn, on -> clearOwn = on)
-            .left().padLeft(10f).padBottom(16f).row();
+            steps.button(Lang.get("recover.rubble.do"), Icon.trash, Styles.defaultt,
+                Vars.iconMed, () -> {
+                    int gone = rubble.clear();
+                    rebuild();
+                    Vars.ui.showInfoFade(Lang.get("recover.rubble.done", gone), 4f);
+                }).tooltip(Lang.get("recover.rubble.hint"));
 
-        body.button("2. Put the whole base back now", Icon.wrench, Styles.defaultt, Vars.iconMed, () -> {
-            int placed = basePlans.placeAll();
-            if (placed == 0) {
-                Vars.ui.showInfo("Nothing to rebuild: the game remembers no destroyed block "
-                    + "for your team on this map.");
-                return;
-            }
-            hide();
-            Vars.ui.showInfoFade(placed + " blocks put back, configurations included.", 6f);
-        }).size(320f, 54f).padBottom(4f).row();
+            steps.button(Lang.get("recover.clear.do"), Icon.eraser, Styles.defaultt,
+                Vars.iconMed, () -> {
+                    int cleared = basePlans.clearBlockers(clearOwn);
+                    Vars.ui.showInfoFade(Lang.get("recover.cleared", cleared), 4f);
+                }).tooltip(Lang.get("recover.clear.hint"));
 
-        body.button("Or queue it for your builders", Icon.hammer, Styles.defaultt, Vars.iconMed, () -> {
-            int queued = basePlans.queueAll();
-            if (queued == 0) {
-                Vars.ui.showInfo("Nothing to rebuild: the game remembers no destroyed block "
-                    + "for your team on this map.");
-                return;
-            }
-            hide();
-            Vars.ui.showInfoFade(queued + " blocks queued. They cost resources and wait "
-                + "for a builder in range, so expect this to take a while.", 6f);
-        }).size(320f, 54f).padBottom(16f).row();
+            steps.button(Lang.get("recover.place.do"), Icon.wrench, Styles.defaultt,
+                Vars.iconMed, () -> {
+                    int placed = basePlans.placeAll();
+                    if (placed == 0) {
+                        Vars.ui.showInfo(Lang.get("recover.nothing"));
+                        return;
+                    }
+                    hide();
+                    Vars.ui.showInfoFade(Lang.get("recover.placed", placed), 5f);
+                }).tooltip(Lang.get("recover.place.hint"));
+        }).row();
 
-        header(body, "Take it somewhere else");
+        body.check(Lang.get("recover.clear.own"), clearOwn, on -> clearOwn = on)
+            .left().padLeft(6f).padBottom(10f)
+            .tooltip(Lang.get("recover.clear.own.hint")).row();
 
-        note(body, "Saves the same plans as schematics, cut into pieces the game will accept, "
-            + "so the base can be rebuilt on another sector entirely. Logic processor "
-            + "links keep their old absolute positions and will need redoing.");
+        body.table(more -> {
+            more.left();
+            more.defaults().size(265f, 52f).pad(4f);
 
-        body.button("Export to schematics", Icon.copy, Styles.defaultt, Vars.iconMed, () -> {
-            var saved = basePlans.export("Recovered base");
-            Vars.ui.showInfoFade(saved.isEmpty()
-                ? "Nothing to export."
-                : saved.size + " schematics saved, look for \"Recovered base\".", 6f);
-        }).size(320f, 54f).row();
+            more.button(Lang.get("recover.queue.do"), Icon.hammer, Styles.defaultt,
+                Vars.iconMed, () -> {
+                    int queued = basePlans.queueAll();
+                    hide();
+                    Vars.ui.showInfoFade(Lang.get("recover.placed", queued), 5f);
+                }).tooltip(Lang.get("recover.queue.hint"));
+
+            more.button(Lang.get("recover.export.do"), Icon.copy, Styles.defaultt,
+                Vars.iconMed, () -> {
+                    var saved = basePlans.export("Recovered base");
+                    Vars.ui.showInfoFade(Lang.get("recover.export.done", saved.size), 5f);
+                }).tooltip(Lang.get("recover.export.hint"));
+        }).row();
     }
 
-    private void buildSnapshots(Table body) {
-        header(body, "Restore points");
-
-        note(body, "Warden copies this sector on a timer and keeps the last twenty. "
-            + "Recovery can only rebuild what the game remembers being destroyed, which "
-            + "leaves out everything deconstructed or lost while you were away. A copy "
-            + "taken beforehand has no such gap, and is the only thing that ever brings "
-            + "a base back whole.");
+    private void buildBackups(Table body) {
+        title(body, "tab.backups");
 
         if (!snapshots.available()) {
-            note(body, "Nothing to copy: this works on a sector or a save you are "
-                + "playing, not on a map opened straight from the editor.");
+            body.add(Lang.get("backups.unavailable")).color(Pal.lightishGray).wrap().width(420f);
             return;
         }
-
-        body.check("Copy automatically", snapshots.automatic(), on -> {
-            snapshots.automatic(on);
-            rebuild();
-        }).left().padBottom(4f).row();
-
-        body.table(rates -> {
-            rates.add("Every").color(Pal.lightishGray).padRight(10f);
-            for (float minutes : Snapshots.intervals) {
-                float value = minutes;
-                rates.button((int) minutes + " min", Styles.togglet, () -> {
-                    snapshots.interval(value);
-                    rebuild();
-                }).checked(button -> snapshots.interval() == value).size(84f, 44f).pad(2f);
-            }
-        }).padBottom(8f).row();
-
-        body.button("Copy now", Icon.save, Styles.defaultt, Vars.iconMed, () -> {
-            snapshots.capture();
-            rebuild();
-            Vars.ui.showInfoFade("Copy taken.", 3f);
-        }).size(240f, 54f).padBottom(12f).row();
 
         Seq<Fi> copies = snapshots.list();
-        if (copies.isEmpty()) {
-            note(body, "No copies of this sector yet. The first one lands within a few "
-                + "minutes of play, or right now with the button above.");
-            return;
-        }
 
-        header(body, copies.size + " copies, newest first");
+        body.table(cards -> {
+            cards.left();
+            card(cards, copies.size, "backups.count", false);
+            card(cards, (int) snapshots.interval(), "backups.minutes", false);
+        }).padBottom(12f).row();
+
+        body.button(Lang.get("backups.now"), Icon.save, Styles.defaultt, Vars.iconLarge, () -> {
+            snapshots.capture();
+            rebuild();
+            Vars.ui.showInfoFade(Lang.get("backups.taken"), 3f);
+        }).size(mainButton, 70f).tooltip(Lang.get("backups.hint")).padBottom(12f).row();
+
+        body.table(row -> {
+            row.left();
+            row.check(Lang.get("backups.auto"), snapshots.automatic(), on -> {
+                snapshots.automatic(on);
+                rebuild();
+            }).padRight(20f);
+
+            row.add(Lang.get("backups.every")).color(Pal.lightishGray).padRight(8f);
+            for (float minutes : Snapshots.intervals) {
+                float value = minutes;
+                row.button(String.valueOf((int) minutes), Styles.togglet, () -> {
+                    snapshots.interval(value);
+                    rebuild();
+                }).checked(button -> snapshots.interval() == value).size(58f, 44f).pad(2f);
+            }
+        }).padBottom(12f).row();
 
         for (Fi copy : copies) {
             long age = snapshots.minutesOld(copy);
-            body.table(row -> {
-                row.add(age == 0 ? "just now" : age + " min ago").width(150f).left();
-                row.add(copy.length() / 1024 + " kB").color(Pal.lightishGray).width(90f).left();
-                row.button("Restore", Icon.refresh, Styles.defaultt, Vars.iconSmall, () ->
-                    Vars.ui.showConfirm("Go back to this copy? Everything since it is "
-                        + "lost, and this cannot be undone from inside the game.", () -> {
+            body.table(Tex.pane, row -> {
+                row.add(age == 0 ? Lang.get("backups.justnow") : Lang.get("backups.ago", age))
+                    .width(170f).left();
+                row.add(copy.length() / 1024 + " kB").color(Pal.lightishGray).width(110f).left();
+                row.button(Lang.get("backups.restore"), Icon.refresh, Styles.defaultt,
+                    Vars.iconSmall, () ->
+                        Vars.ui.showConfirm(Lang.get("backups.confirm"), () -> {
                             hide();
                             snapshots.restore(copy);
-                        })).size(160f, 46f);
-            }).padBottom(4f).row();
+                        })).size(180f, 46f);
+            }).width(520f).pad(3f).row();
         }
     }
 
     private void buildUnits(Table body) {
+        title(body, "tab.units");
+
         if (unitType == null) {
             unitType = spawner.types().first();
         }
@@ -348,12 +354,10 @@ public class WardenDialog extends BaseDialog {
             unitTeam = Vars.player.team();
         }
 
-        header(body, "Spawn units");
-
-        body.table(Tex.pane, selected -> {
+        body.table(selected -> {
             selected.image(new TextureRegionDrawable(unitType.fullIcon)).size(Vars.iconXLarge).pad(6f);
-            selected.add(unitType.localizedName).color(Pal.accent).padLeft(6f).growX().left();
-        }).width(panelWidth - 24f).pad(6f).row();
+            selected.add(unitType.localizedName).color(Pal.accent).padLeft(8f);
+        }).padBottom(8f).row();
 
         body.table(grid -> {
             grid.left();
@@ -363,51 +367,48 @@ public class WardenDialog extends BaseDialog {
                     Vars.iconLarge, () -> {
                         unitType = type;
                         rebuild();
-                    }).size(unitIcon).checked(button -> unitType == type).tooltip(type.localizedName);
+                    }).size(56f).checked(button -> unitType == type).tooltip(type.localizedName);
 
-                if (++index % unitsPerRow == 0) {
+                if (++index % 10 == 0) {
                     grid.row();
                 }
             }
-        }).width(panelWidth - 24f).padBottom(8f).row();
+        }).padBottom(12f).row();
 
-        body.table(teams -> {
-            teams.add("Team").color(Pal.lightishGray).padRight(10f);
+        body.table(row -> {
+            row.left();
+            row.add(Lang.get("units.team")).color(Pal.lightishGray).padRight(10f);
             for (Team team : spawner.teams()) {
-                teams.button(Tex.whiteui, Styles.clearNoneTogglei, 28f, () -> {
+                row.button(Tex.whiteui, Styles.clearNoneTogglei, 30f, () -> {
                     unitTeam = team;
                     rebuild();
-                }).size(46f).pad(2f)
-                    .checked(button -> unitTeam == team)
-                    .tooltip(team.name)
+                }).size(48f).pad(2f).checked(button -> unitTeam == team).tooltip(team.name)
                     .with(button -> button.getStyle().imageUpColor = team.color);
             }
-        }).padBottom(4f).row();
 
-        body.table(counts -> {
-            counts.add("Count").color(Pal.lightishGray).padRight(10f);
+            row.add(Lang.get("units.count")).color(Pal.lightishGray).padLeft(24f).padRight(10f);
             for (int count : new int[]{1, 5, 10, 25}) {
                 int value = count;
-                counts.button(String.valueOf(count), Styles.togglet, () -> {
+                row.button(String.valueOf(count), Styles.togglet, () -> {
                     unitCount = value;
                     rebuild();
-                }).checked(button -> unitCount == value).size(64f, 44f).pad(2f);
+                }).checked(button -> unitCount == value).size(60f, 44f).pad(2f);
             }
-        }).padBottom(8f).row();
+        }).padBottom(12f).row();
 
-        body.button("Spawn", Icon.add, Styles.defaultt, Vars.iconMed, () -> {
+        body.button(Lang.get("units.spawn"), Icon.add, Styles.defaultt, Vars.iconLarge, () -> {
             int spawned = spawner.spawn(unitType, unitTeam, unitCount);
             Vars.ui.showInfoFade(spawned < unitCount
-                ? spawned + " of " + unitCount + " spawned, the team is at its unit cap."
-                : spawned + " " + unitType.localizedName + " spawned.", 4f);
-        }).size(240f, 54f).row();
+                ? Lang.get("units.capped", spawned, unitCount)
+                : Lang.get("units.spawned", spawned + " " + unitType.localizedName), 4f);
+        }).size(mainButton, 70f).row();
     }
 
     private void buildSupplies(Table body) {
-        header(body, "Resources");
+        title(body, "tab.supplies");
 
         if (!supplies.hasCore()) {
-            note(body, "Your team has no core on this map, so there is nowhere to put items.");
+            body.add(Lang.get("supplies.nocore")).color(Pal.lightishGray);
             return;
         }
 
@@ -421,148 +422,180 @@ public class WardenDialog extends BaseDialog {
                             selectedItems.remove(item);
                         }
                         rebuild();
-                    }).size(44f).checked(button -> selectedItems.contains(item))
+                    }).size(56f).checked(button -> selectedItems.contains(item))
                     .tooltip(item.localizedName);
 
                 if (++index % 10 == 0) {
                     items.row();
                 }
             }
-        }).padBottom(4f).row();
-
-        body.check("Show items from other planets", allPlanets, on -> {
-            allPlanets = on;
-            rebuild();
-        }).left().padBottom(8f).row();
-
-        body.table(amounts -> {
-            amounts.add("Amount").color(Pal.lightishGray).padRight(10f);
-            for (int option : new int[]{1000, 10000, supplies.capacity()}) {
-                int value = option;
-                amounts.button(value == supplies.capacity() ? "Max" : (value / 1000) + "k",
-                    Styles.togglet, () -> {
-                        giveAmount = value;
-                        rebuild();
-                    }).checked(button -> giveAmount == value).size(76f, 44f).pad(2f);
-            }
         }).padBottom(8f).row();
 
+        body.table(row -> {
+            row.left();
+            row.add(Lang.get("supplies.amount")).color(Pal.lightishGray).padRight(10f);
+            for (int option : new int[]{100, 1000, 10000, supplies.capacity()}) {
+                int value = option;
+                row.button(value == supplies.capacity() ? Lang.get("supplies.max")
+                        : (value >= 1000 ? (value / 1000) + "k" : String.valueOf(value)),
+                    Styles.togglet, () -> {
+                        amount = value;
+                        rebuild();
+                    }).checked(button -> amount == value).size(70f, 44f).pad(2f);
+            }
+
+            row.check(Lang.get("supplies.otherplanets"), allPlanets, on -> {
+                allPlanets = on;
+                rebuild();
+            }).padLeft(24f);
+        }).padBottom(12f).row();
+
         body.table(actions -> {
-            actions.button("Give selected", Icon.add, Styles.defaultt, Vars.iconMed, () -> {
+            actions.left();
+            actions.defaults().size(180f, 62f).pad(4f);
+
+            actions.button(Lang.get("supplies.give"), Icon.add, Styles.defaultt, Vars.iconMed, () -> {
                 if (selectedItems.isEmpty()) {
-                    Vars.ui.showInfo("Pick at least one item above first.");
+                    Vars.ui.showInfo(Lang.get("supplies.pick"));
                     return;
                 }
-                int given = supplies.give(selectedItems, giveAmount);
-                Vars.ui.showInfoFade(given + " kinds set to " + giveAmount + ".", 4f);
-            }).size(230f, 54f).pad(2f);
+                Vars.ui.showInfoFade(
+                    Lang.get("supplies.given", supplies.give(selectedItems, amount), amount), 4f);
+            });
 
-            actions.button("Give everything here", Icon.box, Styles.defaultt, Vars.iconMed, () -> {
+            actions.button(Lang.get("supplies.take"), Icon.download, Styles.defaultt,
+                Vars.iconMed, () -> {
+                    if (selectedItems.isEmpty()) {
+                        Vars.ui.showInfo(Lang.get("supplies.pick"));
+                        return;
+                    }
+                    Vars.ui.showInfoFade(
+                        Lang.get("supplies.taken", supplies.take(selectedItems, amount)), 4f);
+                });
+
+            actions.button(Lang.get("supplies.empty"), Icon.trash, Styles.defaultt,
+                Vars.iconMed, () -> {
+                    if (selectedItems.isEmpty()) {
+                        Vars.ui.showInfo(Lang.get("supplies.pick"));
+                        return;
+                    }
+                    Vars.ui.showInfoFade(Lang.get("supplies.taken",
+                        supplies.take(selectedItems, Integer.MAX_VALUE)), 4f);
+                });
+        }).padBottom(10f).row();
+
+        body.table(more -> {
+            more.left();
+            more.defaults().size(280f, 52f).pad(3f);
+
+            more.button(Lang.get("supplies.all"), Icon.box, Styles.defaultt, Vars.iconMed, () -> {
                 var local = supplies.items(false);
                 supplies.give(local, supplies.capacity());
-                Vars.ui.showInfoFade(local.size + " kinds filled to capacity.", 4f);
-            }).size(230f, 54f).pad(2f);
-        }).row();
+                Vars.ui.showInfoFade(Lang.get("supplies.given", local.size,
+                    supplies.capacity()), 4f);
+            });
 
-        body.button("Remove what belongs to another planet", Icon.trash, Styles.defaultt,
-            Vars.iconMed, () -> {
-                int removed = supplies.removeForeign();
-                Vars.ui.showInfoFade(removed == 0
-                    ? "Nothing foreign in your core."
-                    : removed + " kinds cleared out of the core.", 4f);
-            }).size(360f, 50f).padBottom(16f).row();
+            more.button(Lang.get("supplies.foreign"), Icon.trash, Styles.defaultt,
+                Vars.iconMed, () ->
+                    Vars.ui.showInfoFade(Lang.get("supplies.taken", supplies.removeForeign()), 4f));
+        }).padBottom(10f).row();
 
-        header(body, "Research");
-
-        note(body, "Unlocking is stored on your profile, not in this save: it stays unlocked "
-            + "in every campaign afterwards, and there is no undo.");
-
-        body.button("Unlock all research", Icon.tree, Styles.defaultt, Vars.iconMed, () ->
-            Vars.ui.showConfirm("Unlock everything in the tech tree, permanently?", () ->
-                Vars.ui.showInfoFade(supplies.unlockAll() + " entries unlocked.", 4f)))
-            .size(280f, 54f).row();
+        body.button(Lang.get("supplies.research"), Icon.tree, Styles.defaultt, Vars.iconMed, () ->
+            Vars.ui.showConfirm(Lang.get("supplies.research.confirm"), () ->
+                Vars.ui.showInfoFade(Lang.get("supplies.research.done", supplies.unlockAll()), 4f)))
+            .size(280f, 52f).tooltip(Lang.get("supplies.research.hint")).row();
     }
 
     private void buildSpeed(Table body) {
-        header(body, "Game speed");
+        title(body, "speed.game");
+
+        body.table(cards -> {
+            cards.left();
+            card(cards, label(speed.achieved()), "speed.actual", speed.throttled());
+            card(cards, label(tuning.unitSpeed()), "speed.you", false);
+        }).padBottom(10f).row();
 
         body.table(steps -> {
+            steps.left();
             int index = 0;
             for (float step : GameSpeed.steps) {
                 float value = step;
                 steps.button(label(step), Styles.togglet, () -> {
                     speed.multiplier(value);
                     rebuild();
-                }).checked(button -> speed.multiplier() == value).size(76f, 46f).pad(2f);
+                }).checked(button -> speed.multiplier() == value).size(86f, 46f).pad(2f);
 
+                // Nine speeds do not fit one row of the panel, and the row that overflows
+                // is the one holding 64x, which is the reason anyone opens this section.
                 if (++index % 5 == 0) {
                     steps.row();
                 }
             }
-        }).padBottom(6f).row();
+        }).padBottom(4f).row();
 
-        body.table(Tex.pane, status -> {
-            status.defaults().left().growX().pad(2f);
-            status.label(() -> "Actually running at " + label(speed.achieved()))
-                .update(label -> label.setColor(speed.throttled() ? Pal.accent : Pal.lightishGray)).row();
-        }).width(panelWidth - 24f).pad(6f).row();
+        body.add(Lang.get("speed.game.hint")).color(Pal.lightishGray).wrap().width(560f)
+            .padBottom(14f).row();
 
-        note(body, "Everything moves: units, conveyors, waves, you. Above 1x the world runs "
-            + "several times per frame rather than in bigger steps, so the simulation "
-            + "stays exact. The number is a ceiling, not a promise: extra ticks only get "
-            + "a few milliseconds per frame, so a big base will run below what you asked "
-            + "rather than freeze. Fast forward also pauses while this panel is open.");
-
-        header(body, "Your movement speed");
-
-        note(body, "This one is yours alone, and does not touch the speed of the game.");
+        title(body, "speed.you");
 
         body.table(steps -> {
+            steps.left();
             for (float step : UnitTuning.steps) {
                 float value = step;
                 steps.button(label(step), Styles.togglet, () -> {
                     tuning.unitSpeed(value);
                     rebuild();
-                }).checked(button -> tuning.unitSpeed() == value).size(76f, 46f).pad(2f);
+                }).checked(button -> tuning.unitSpeed() == value).size(86f, 46f).pad(2f);
             }
-        }).padBottom(4f).row();
-
-        body.check("Every unit of my team, not just mine", tuning.wholeTeam(),
-            tuning::wholeTeam).left().padBottom(16f).row();
-
-        header(body, "Building and mining");
+            steps.check(Lang.get("speed.team"), tuning.wholeTeam(), tuning::wholeTeam).padLeft(20f);
+        }).padBottom(14f).row();
 
         body.table(rates -> {
-            rates.add("Build").color(Pal.lightishGray).padRight(10f);
+            rates.left();
+            rates.add(Lang.get("speed.build")).color(Pal.lightishGray).width(160f);
             for (float step : UnitTuning.steps) {
                 float value = step;
                 rates.button(label(step), Styles.togglet, () -> {
                     tuning.buildSpeed(value);
                     rebuild();
-                }).checked(button -> tuning.buildSpeed() == value).size(70f, 44f).pad(2f);
+                }).checked(button -> tuning.buildSpeed() == value).size(68f, 44f).pad(2f);
             }
         }).row();
 
         body.table(rates -> {
-            rates.add("Mine").color(Pal.lightishGray).padRight(10f);
+            rates.left();
+            rates.add(Lang.get("speed.mine")).color(Pal.lightishGray).width(160f);
             for (float step : UnitTuning.steps) {
                 float value = step;
                 rates.button(label(step), Styles.togglet, () -> {
                     tuning.mineSpeed(value);
                     rebuild();
-                }).checked(button -> tuning.mineSpeed() == value).size(70f, 44f).pad(2f);
+                }).checked(button -> tuning.mineSpeed() == value).size(68f, 44f).pad(2f);
+            }
+        }).padBottom(14f).row();
+
+        body.check(Lang.get("speed.invulnerable"), invulnerability.enabled(),
+            invulnerability::toggle).left().tooltip(Lang.get("speed.invulnerable.hint")).row();
+    }
+
+    private void buildSettings(Table body) {
+        title(body, "settings.language");
+
+        body.table(languages -> {
+            languages.left();
+            for (String code : new String[]{"fr", "en"}) {
+                languages.button(code.equals("fr") ? "Français" : "English", Styles.togglet, () -> {
+                    Lang.language(code);
+                    rebuild();
+                }).checked(button -> Lang.language().equals(code)).size(180f, 52f).pad(3f);
             }
         }).padBottom(16f).row();
 
-        header(body, "Invulnerability");
+        title(body, "settings.key");
 
-        note(body, "A team rule, so it travels with the save. Turn it off before you put the "
-            + "game away.");
+        body.add(Lang.get("settings.key.value")).color(Pal.lightishGray).padBottom(16f).row();
 
-        body.check("Blocks and units of your team", invulnerability.enabled(), on -> {
-            invulnerability.toggle(on);
-            Vars.ui.showInfoFade(on ? "Invulnerable." : "Back to normal health.", 3f);
-        }).left().row();
+        body.add(Lang.get("settings.about")).color(Pal.lightishGray).wrap().width(520f).row();
     }
 
     /** "1x" rather than "1.0x", which is what the game would print. */

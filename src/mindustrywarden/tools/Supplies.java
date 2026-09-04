@@ -110,6 +110,26 @@ public final class Supplies {
         return given;
     }
 
+    /**
+     * Take {@code amount} of each given item out of the core, and return how many kinds
+     * lost something. An amount at or above what is held empties that item.
+     */
+    public int take(Iterable<Item> items, int amount) {
+        CoreBuild core = Vars.player.team().core();
+        if (core == null) {
+            return 0;
+        }
+        int taken = 0;
+        for (Item item : items) {
+            int held = core.items.get(item);
+            if (held > 0) {
+                core.items.set(item, Math.max(0, held - amount));
+                taken++;
+            }
+        }
+        return taken;
+    }
+
     /** Empty the core of everything that belongs to another planet, and count it. */
     public int removeForeign() {
         CoreBuild core = Vars.player.team().core();

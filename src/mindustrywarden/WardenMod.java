@@ -51,6 +51,9 @@ public class WardenMod extends Mod {
             if (WardenRestore.requested()) {
                 new WardenRestore().run();
             }
+            if (WardenShots.requested()) {
+                new WardenShots(dialog).run();
+            }
         });
     }
 

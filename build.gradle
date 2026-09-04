@@ -16,6 +16,12 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
 }
 
+// The panel speaks French, and the sources hold its accents directly. Without this the
+// compiler reads them in the platform encoding and the game shows "RÃ©parer".
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
 ext {
     // Must match the client this mod is installed into. The game's own classes are the
     // only API here, and they move between versions without warning.
