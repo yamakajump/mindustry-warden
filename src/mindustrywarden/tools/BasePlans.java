@@ -10,6 +10,7 @@ import mindustry.game.Schematic.Stile;
 import mindustry.game.Team;
 import mindustry.game.Teams.BlockPlan;
 import mindustry.gen.Building;
+import mindustry.gen.Call;
 import mindustry.world.Tile;
 import mindustry.world.blocks.storage.CoreBlock.CoreBuild;
 
@@ -91,6 +92,44 @@ public final class BasePlans {
             return true;
         }
         return includeOwn && !(building instanceof CoreBuild);
+    }
+
+    /**
+     * Put every plan back on the map at once, and return how many blocks landed.
+     *
+     * <p>Queueing is the honest way and it is slow for a reason: a build plan waits on
+     * the resources in your core and on a builder being within range of it, so a base
+     * spread over a sector comes back in pieces over several minutes, or not at all.
+     * This does not queue anything. It writes the blocks straight into the world, with
+     * their configuration, and takes each plan off the list as it goes.
+     *
+     * <p>Blocks go in through {@code setNet} and configurations through
+     * {@code Call.tileConfig}, so a hosted game sends both to the other players instead
+     * of growing a base only the host can see.
+     */
+    public int placeAll() {
+        Team mine = Vars.player.team();
+        var pending = Vars.state.teams.get(mine).plans;
+        int placed = 0;
+
+        for (BlockPlan plan : plans()) {
+            Tile tile = Vars.world.tile(plan.x, plan.y);
+            if (tile == null) {
+                continue;
+            }
+
+            tile.setNet(plan.block, mine, plan.rotation);
+
+            if (plan.config != null && tile.build != null) {
+                Call.tileConfig(Vars.player, tile.build, plan.config);
+            }
+
+            // The game only drops a plan when a builder finishes it, and nothing here is
+            // a builder. Left in, the list would keep offering blocks already standing.
+            pending.remove(other -> other.x == plan.x && other.y == plan.y);
+            placed++;
+        }
+        return placed;
     }
 
     /** Queue every plan for rebuilding, which is holding B over the whole map at once. */

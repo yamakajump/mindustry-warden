@@ -189,7 +189,18 @@ public class WardenDialog extends BaseDialog {
         body.check("Clear my own blocks too, such as the launch loadout", clearOwn, on -> clearOwn = on)
             .left().padLeft(10f).padBottom(16f).row();
 
-        body.button("2. Queue everything for rebuild", Icon.hammer, Styles.defaultt, Vars.iconMed, () -> {
+        body.button("2. Put the whole base back now", Icon.wrench, Styles.defaultt, Vars.iconMed, () -> {
+            int placed = basePlans.placeAll();
+            if (placed == 0) {
+                Vars.ui.showInfo("Nothing to rebuild: the game remembers no destroyed block\n"
+                    + "for your team on this map.");
+                return;
+            }
+            hide();
+            Vars.ui.showInfoFade(placed + " blocks put back, configurations included.", 6f);
+        }).size(320f, 54f).padBottom(4f).row();
+
+        body.button("Or queue it for your builders", Icon.hammer, Styles.defaultt, Vars.iconMed, () -> {
             int queued = basePlans.queueAll();
             if (queued == 0) {
                 Vars.ui.showInfo("Nothing to rebuild: the game remembers no destroyed block\n"
@@ -197,8 +208,8 @@ public class WardenDialog extends BaseDialog {
                 return;
             }
             hide();
-            Vars.ui.showInfoFade(queued + " blocks queued. Your builders and any support\n"
-                + "unit on the map will work through them.", 6f);
+            Vars.ui.showInfoFade(queued + " blocks queued. They cost resources and wait for a\n"
+                + "builder in range, so expect this to take a while.", 6f);
         }).size(320f, 54f).padBottom(16f).row();
 
         header(body, "Take it somewhere else");
