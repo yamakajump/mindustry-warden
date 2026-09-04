@@ -2,11 +2,13 @@ package mindustrywarden;
 
 import arc.scene.style.TextureRegionDrawable;
 import arc.scene.ui.layout.Table;
+import arc.struct.ObjectSet;
 import mindustry.Vars;
 import mindustry.game.Team;
 import mindustry.gen.Icon;
 import mindustry.gen.Tex;
 import mindustry.graphics.Pal;
+import mindustry.type.Item;
 import mindustry.type.UnitType;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
@@ -62,6 +64,10 @@ public class WardenDialog extends BaseDialog {
     private Tab tab = Tab.capture;
     /** Off by default: clearing your own blocks is the rarer, more destructive intent. */
     private boolean clearOwn;
+    /** Off by default: a Serpulo core has no use for carbide, and it only gets in the way. */
+    private boolean allPlanets;
+    private final ObjectSet<Item> selectedItems = new ObjectSet<>();
+    private int giveAmount = 1000;
     private UnitType unitType;
     private Team unitTeam;
     private int unitCount = 1;
@@ -292,13 +298,71 @@ public class WardenDialog extends BaseDialog {
     private void buildSupplies(Table body) {
         header(body, "Resources");
 
-        body.button("Fill the core", Icon.box, Styles.defaultt, Vars.iconMed, () -> {
-            if (!supplies.hasCore()) {
-                Vars.ui.showInfo("Your team has no core on this map.");
-                return;
+        if (!supplies.hasCore()) {
+            note(body, "Your team has no core on this map, so there is nowhere to put items.");
+            return;
+        }
+
+        body.table(items -> {
+            items.left();
+            int index = 0;
+            for (Item item : supplies.items(allPlanets)) {
+                items.button(new TextureRegionDrawable(item.uiIcon), Styles.clearNoneTogglei,
+                    Vars.iconLarge, () -> {
+                        if (!selectedItems.add(item)) {
+                            selectedItems.remove(item);
+                        }
+                        rebuild();
+                    }).size(44f).checked(button -> selectedItems.contains(item))
+                    .tooltip(item.localizedName);
+
+                if (++index % 10 == 0) {
+                    items.row();
+                }
             }
-            Vars.ui.showInfoFade(supplies.fillCore() + " item kinds topped up to capacity.", 4f);
-        }).size(280f, 54f).padBottom(16f).row();
+        }).padBottom(4f).row();
+
+        body.check("Show items from other planets", allPlanets, on -> {
+            allPlanets = on;
+            rebuild();
+        }).left().padBottom(8f).row();
+
+        body.table(amounts -> {
+            amounts.add("Amount").color(Pal.lightishGray).padRight(10f);
+            for (int option : new int[]{1000, 10000, supplies.capacity()}) {
+                int value = option;
+                amounts.button(value == supplies.capacity() ? "Max" : (value / 1000) + "k",
+                    Styles.togglet, () -> {
+                        giveAmount = value;
+                        rebuild();
+                    }).checked(button -> giveAmount == value).size(76f, 44f).pad(2f);
+            }
+        }).padBottom(8f).row();
+
+        body.table(actions -> {
+            actions.button("Give selected", Icon.add, Styles.defaultt, Vars.iconMed, () -> {
+                if (selectedItems.isEmpty()) {
+                    Vars.ui.showInfo("Pick at least one item above first.");
+                    return;
+                }
+                int given = supplies.give(selectedItems, giveAmount);
+                Vars.ui.showInfoFade(given + " kinds set to " + giveAmount + ".", 4f);
+            }).size(230f, 54f).pad(2f);
+
+            actions.button("Give everything here", Icon.box, Styles.defaultt, Vars.iconMed, () -> {
+                var local = supplies.items(false);
+                supplies.give(local, supplies.capacity());
+                Vars.ui.showInfoFade(local.size + " kinds filled to capacity.", 4f);
+            }).size(230f, 54f).pad(2f);
+        }).row();
+
+        body.button("Remove what belongs to another planet", Icon.trash, Styles.defaultt,
+            Vars.iconMed, () -> {
+                int removed = supplies.removeForeign();
+                Vars.ui.showInfoFade(removed == 0
+                    ? "Nothing foreign in your core."
+                    : removed + " kinds cleared out of the core.", 4f);
+            }).size(360f, 50f).padBottom(16f).row();
 
         header(body, "Research");
 
