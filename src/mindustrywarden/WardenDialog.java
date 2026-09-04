@@ -62,10 +62,21 @@ public class WardenDialog extends BaseDialog {
         }
     }
 
-    private static final float menuWidth = 230f;
-    private static final float cardWidth = 168f;
+    private static final float menuWidthMax = 230f;
     private static final float cardHeight = 100f;
-    private static final float mainButton = 430f;
+
+    /**
+     * Everything below is measured against the window, not fixed.
+     *
+     * <p>The panel rebuilt itself on resize while keeping the widths it was written with,
+     * so on a small window the rows ran off the right edge: a "Restaurer" button reading
+     * "Restau", a row of cards wider than the space holding them. These are recomputed on
+     * every rebuild from what the window actually allows.
+     */
+    private float menuWidth = menuWidthMax;
+    private float contentWidth = 700f;
+    private float cardWidth = 168f;
+    private float mainButton = 430f;
 
     private final SectorCapture capture = new SectorCapture();
     private final BasePlans basePlans = new BasePlans();
@@ -129,7 +140,7 @@ public class WardenDialog extends BaseDialog {
                 warning.image(Icon.warning).color(Pal.remove).size(Vars.iconLarge).padRight(12f);
                 warning.add(Vars.state.isGame()
                     ? Lang.get("guard.client")
-                    : Lang.get("guard.nogame")).wrap().width(420f).color(Pal.lightishGray);
+                    : Lang.get("guard.nogame")).wrap().width(Math.min(420f, contentWidth)).color(Pal.lightishGray);
             }).pad(20f).row();
             return;
         }
@@ -137,8 +148,15 @@ public class WardenDialog extends BaseDialog {
         // Wide enough to lay a section out in rows, narrow enough that the rows reach
         // the far edge: a panel with an empty right third reads as a panel that was cut
         // off, which is what the first attempt at this looked like.
-        float width = Math.min(Core.graphics.getWidth() / Scl.scl(1f) * 0.52f, 980f);
-        float height = Math.min(Core.graphics.getHeight() / Scl.scl(1f) * 0.7f, 880f);
+        float screen = Core.graphics.getWidth() / Scl.scl(1f);
+        // Half the screen when there is room, nearly all of it when there is not.
+        float width = Math.min(Math.max(screen * 0.52f, 560f), screen - 30f);
+        float height = Math.min(Core.graphics.getHeight() / Scl.scl(1f) * 0.72f, 880f);
+
+        menuWidth = Math.min(menuWidthMax, width * 0.3f);
+        contentWidth = width - menuWidth - 30f;
+        cardWidth = Math.min(168f, (contentWidth - 24f) / 3f);
+        mainButton = Math.min(430f, contentWidth - 10f);
 
         cont.table(root -> {
             root.table(Tex.pane, menu -> {
@@ -189,6 +207,26 @@ public class WardenDialog extends BaseDialog {
         }).size(cardWidth, cardHeight).pad(4f);
     }
 
+    /** How many items of this width fit one row of the section. */
+    private int perRow(float itemWidth) {
+        return Math.max(1, (int) (contentWidth / (itemWidth + 6f)));
+    }
+
+    /** The width one of {@code count} buttons may take on a row, capped at its natural size. */
+    private float rowOf(int count, float natural) {
+        return Math.min(natural, (contentWidth - count * 10f) / count);
+    }
+
+    /**
+     * How many buttons of at least {@code minWidth} fit a row.
+     *
+     * <p>Used instead of a fixed count so a narrow window wraps a row rather than
+     * squeezing its buttons until "Donner" reads "Donn er" over two lines.
+     */
+    private int fit(float minWidth) {
+        return Math.max(1, (int) (contentWidth / (minWidth + 10f)));
+    }
+
     private void title(Table table, String key) {
         table.add(Lang.get(key)).color(Pal.accent).left().growX().padTop(4f).row();
         table.image().color(Pal.accent).height(3f).growX().padBottom(10f).row();
@@ -211,7 +249,7 @@ public class WardenDialog extends BaseDialog {
 
         mindustry.type.Sector current = Vars.state.rules.sector;
         if (current != null && current.isCaptured()) {
-            body.add(Lang.get("capture.already")).color(Pal.lightishGray).wrap().width(520f).row();
+            body.add(Lang.get("capture.already")).color(Pal.lightishGray).wrap().width(contentWidth).row();
         }
 
         body.button(Lang.get("capture.do"), Icon.modeAttack, Styles.defaultt, Vars.iconLarge, () -> {
@@ -257,7 +295,7 @@ public class WardenDialog extends BaseDialog {
 
         body.table(steps -> {
             steps.left();
-            steps.defaults().size(265f, 56f).pad(4f);
+            steps.defaults().size(rowOf(Math.min(2, fit(240f)), 265f), 56f).pad(4f);
 
             steps.button(Lang.get("recover.rubble.do"), Icon.trash, Styles.defaultt,
                 Vars.iconMed, () -> {
@@ -292,7 +330,7 @@ public class WardenDialog extends BaseDialog {
 
         body.table(more -> {
             more.left();
-            more.defaults().size(265f, 52f).pad(4f);
+            more.defaults().size(rowOf(Math.min(2, fit(240f)), 265f), 52f).pad(4f);
 
             more.button(Lang.get("recover.queue.do"), Icon.hammer, Styles.defaultt,
                 Vars.iconMed, () -> {
@@ -313,7 +351,7 @@ public class WardenDialog extends BaseDialog {
         title(body, "tab.backups");
 
         if (!snapshots.available()) {
-            body.add(Lang.get("backups.unavailable")).color(Pal.lightishGray).wrap().width(420f);
+            body.add(Lang.get("backups.unavailable")).color(Pal.lightishGray).wrap().width(contentWidth);
             return;
         }
 
@@ -352,15 +390,15 @@ public class WardenDialog extends BaseDialog {
             long age = snapshots.minutesOld(copy);
             body.table(Tex.pane, row -> {
                 row.add(age == 0 ? Lang.get("backups.justnow") : Lang.get("backups.ago", age))
-                    .width(170f).left();
-                row.add(copy.length() / 1024 + " kB").color(Pal.lightishGray).width(110f).left();
+                    .growX().left();
+                row.add(copy.length() / 1024 + " kB").color(Pal.lightishGray).width(100f).left();
                 row.button(Lang.get("backups.restore"), Icon.refresh, Styles.defaultt,
                     Vars.iconSmall, () ->
                         Vars.ui.showConfirm(Lang.get("backups.confirm"), () -> {
                             hide();
                             snapshots.restore(copy);
-                        })).size(180f, 46f);
-            }).width(520f).pad(3f).row();
+                        })).size(Math.min(180f, contentWidth * 0.3f), 46f);
+            }).width(contentWidth - 8f).pad(3f).row();
         }
     }
 
@@ -396,7 +434,7 @@ public class WardenDialog extends BaseDialog {
                         rebuild();
                     }).size(56f).checked(button -> unitType == type).tooltip(type.localizedName);
 
-                if (++index % 10 == 0) {
+                if (++index % perRow(56f) == 0) {
                     grid.row();
                 }
             }
@@ -469,7 +507,7 @@ public class WardenDialog extends BaseDialog {
                     }).size(56f).checked(button -> selectedItems.contains(item))
                     .tooltip(item.localizedName);
 
-                if (++index % 10 == 0) {
+                if (++index % perRow(56f) == 0) {
                     items.row();
                 }
             }
@@ -488,15 +526,23 @@ public class WardenDialog extends BaseDialog {
                     }).checked(button -> amount == value).size(70f, 44f).pad(2f);
             }
 
-            row.check(Lang.get("supplies.otherplanets"), allPlanets, on -> {
-                allPlanets = on;
-                rebuild();
-            }).padLeft(24f);
-        }).padBottom(12f).row();
+        }).padBottom(4f).row();
+
+        body.check(Lang.get("supplies.otherplanets"), allPlanets, on -> {
+            allPlanets = on;
+            rebuild();
+        }).left().padBottom(12f).row();
 
         body.table(actions -> {
             actions.left();
-            actions.defaults().size(180f, 62f).pad(4f);
+            int perLine = Math.min(3, fit(170f));
+            actions.defaults().size(rowOf(perLine, 190f), 62f).pad(4f);
+            int[] placed = {0};
+            Runnable wrap = () -> {
+                if (++placed[0] % perLine == 0) {
+                    actions.row();
+                }
+            };
 
             actions.button(Lang.get("supplies.give"), Icon.add, Styles.defaultt, Vars.iconMed, () -> {
                 if (selectedItems.isEmpty()) {
@@ -506,6 +552,7 @@ public class WardenDialog extends BaseDialog {
                 Vars.ui.showInfoFade(
                     Lang.get("supplies.given", supplies.give(selectedItems, amount), amount), 4f);
             });
+            wrap.run();
 
             actions.button(Lang.get("supplies.take"), Icon.download, Styles.defaultt,
                 Vars.iconMed, () -> {
@@ -516,6 +563,7 @@ public class WardenDialog extends BaseDialog {
                     Vars.ui.showInfoFade(
                         Lang.get("supplies.taken", supplies.take(selectedItems, amount)), 4f);
                 });
+            wrap.run();
 
             actions.button(Lang.get("supplies.empty"), Icon.trash, Styles.defaultt,
                 Vars.iconMed, () -> {
@@ -526,11 +574,13 @@ public class WardenDialog extends BaseDialog {
                     Vars.ui.showInfoFade(Lang.get("supplies.taken",
                         supplies.take(selectedItems, Integer.MAX_VALUE)), 4f);
                 });
+            wrap.run();
         }).padBottom(10f).row();
 
         body.table(more -> {
             more.left();
-            more.defaults().size(280f, 52f).pad(3f);
+            int perLine = Math.min(2, fit(240f));
+            more.defaults().size(rowOf(perLine, 280f), 52f).pad(3f);
 
             more.button(Lang.get("supplies.all"), Icon.box, Styles.defaultt, Vars.iconMed, () -> {
                 var local = supplies.items(false);
@@ -541,13 +591,18 @@ public class WardenDialog extends BaseDialog {
 
             more.button(Lang.get("supplies.foreign"), Icon.trash, Styles.defaultt,
                 Vars.iconMed, () ->
-                    Vars.ui.showInfoFade(Lang.get("supplies.taken", supplies.removeForeign()), 4f));
+                    Vars.ui.showInfoFade(Lang.get("supplies.taken", supplies.removeForeign()), 4f))
+                .with(button -> {
+                    if (perLine == 1) {
+                        more.row();
+                    }
+                });
         }).padBottom(10f).row();
 
         body.button(Lang.get("supplies.research"), Icon.tree, Styles.defaultt, Vars.iconMed, () ->
             Vars.ui.showConfirm(Lang.get("supplies.research.confirm"), () ->
                 Vars.ui.showInfoFade(Lang.get("supplies.research.done", supplies.unlockAll()), 4f)))
-            .size(280f, 52f).tooltip(Lang.get("supplies.research.hint")).row();
+            .size(rowOf(2, 280f), 52f).tooltip(Lang.get("supplies.research.hint")).row();
     }
 
     private void buildSpeed(Table body) {
@@ -571,13 +626,13 @@ public class WardenDialog extends BaseDialog {
 
                 // Nine speeds do not fit one row of the panel, and the row that overflows
                 // is the one holding 64x, which is the reason anyone opens this section.
-                if (++index % 5 == 0) {
+                if (++index % perRow(90f) == 0) {
                     steps.row();
                 }
             }
         }).padBottom(4f).row();
 
-        body.add(Lang.get("speed.game.hint")).color(Pal.lightishGray).wrap().width(560f)
+        body.add(Lang.get("speed.game.hint")).color(Pal.lightishGray).wrap().width(contentWidth)
             .padBottom(14f).row();
 
         title(body, "speed.you");
@@ -596,27 +651,31 @@ public class WardenDialog extends BaseDialog {
 
         body.table(rates -> {
             rates.left();
-            rates.add(Lang.get("speed.build")).color(Pal.lightishGray).width(160f)
+            rates.add(Lang.get("speed.build")).color(Pal.lightishGray)
+                .width(Math.min(160f, contentWidth * 0.3f))
                 .tooltip(Lang.get("speed.build.hint"));
             for (float step : UnitTuning.steps) {
                 float value = step;
                 rates.button(label(step), Styles.togglet, () -> {
                     tuning.buildSpeed(value);
                     rebuild();
-                }).checked(button -> tuning.buildSpeed() == value).size(68f, 44f).pad(2f);
+                }).checked(button -> tuning.buildSpeed() == value)
+                    .size(Math.min(68f, (contentWidth * 0.7f - 20f) / 5f), 44f).pad(2f);
             }
         }).row();
 
         body.table(rates -> {
             rates.left();
-            rates.add(Lang.get("speed.mine")).color(Pal.lightishGray).width(160f)
+            rates.add(Lang.get("speed.mine")).color(Pal.lightishGray)
+                .width(Math.min(160f, contentWidth * 0.3f))
                 .tooltip(Lang.get("speed.mine.hint"));
             for (float step : UnitTuning.steps) {
                 float value = step;
                 rates.button(label(step), Styles.togglet, () -> {
                     tuning.mineSpeed(value);
                     rebuild();
-                }).checked(button -> tuning.mineSpeed() == value).size(68f, 44f).pad(2f);
+                }).checked(button -> tuning.mineSpeed() == value)
+                    .size(Math.min(68f, (contentWidth * 0.7f - 20f) / 5f), 44f).pad(2f);
             }
         }).padBottom(14f).row();
 
@@ -641,7 +700,7 @@ public class WardenDialog extends BaseDialog {
 
         body.add(Lang.get("settings.key.value")).color(Pal.lightishGray).padBottom(16f).row();
 
-        body.add(Lang.get("settings.about")).color(Pal.lightishGray).wrap().width(520f).row();
+        body.add(Lang.get("settings.about")).color(Pal.lightishGray).wrap().width(contentWidth).row();
     }
 
     /** "1x" rather than "1.0x", which is what the game would print. */

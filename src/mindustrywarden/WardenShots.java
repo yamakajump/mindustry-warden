@@ -51,6 +51,15 @@ final class WardenShots {
         // Some rubble and a plan, so the cards have numbers rather than zeroes.
         Vars.world.tile(40, 40).setBlock(Blocks.titaniumWall, Team.derelict, 0);
 
+        // A small window is where a fixed width shows itself, so the pass can ask for
+        // one: WARDEN_SHOT_SIZE=1000x700.
+        String size = System.getenv("WARDEN_SHOT_SIZE");
+        if (size != null && size.contains("x")) {
+            String[] parts = size.split("x");
+            Core.graphics.setWindowSize(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
+            Log.info("[shots] window @", size);
+        }
+
         Core.app.post(() -> shoot(0));
     }
 
