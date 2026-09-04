@@ -60,6 +60,8 @@ public class WardenDialog extends BaseDialog {
     private final GameSpeed speed;
 
     private Tab tab = Tab.capture;
+    /** Off by default: clearing your own blocks is the rarer, more destructive intent. */
+    private boolean clearOwn;
     private UnitType unitType;
     private Team unitTeam;
     private int unitCount = 1;
@@ -173,15 +175,19 @@ public class WardenDialog extends BaseDialog {
 
         note(body, "The game files every building of yours that dies, with its position and\n"
             + "its configuration, and keeps the list in the save. Clear what was built on\n"
-            + "top of them first: a plan under an enemy block queues fine and then never\n"
-            + "builds, because nothing can be placed on an occupied tile.");
+            + "top of them first: a plan under an occupied tile queues fine and then never\n"
+            + "builds. The starter base the game drops when you launch counts as covering,\n"
+            + "which is what the second option is for. Cores are never removed.");
 
         body.button("1. Clear what covers them", Icon.eraser, Styles.defaultt, Vars.iconMed, () -> {
-            int cleared = basePlans.clearBlockers();
+            int cleared = basePlans.clearBlockers(clearOwn);
             Vars.ui.showInfoFade(cleared == 0
                 ? "Nothing was standing on your plans."
                 : cleared + " tiles cleared of what was built over your base.", 5f);
-        }).size(320f, 54f).padBottom(4f).row();
+        }).size(320f, 54f).row();
+
+        body.check("Clear my own blocks too, such as the launch loadout", clearOwn, on -> clearOwn = on)
+            .left().padLeft(10f).padBottom(16f).row();
 
         body.button("2. Queue everything for rebuild", Icon.hammer, Styles.defaultt, Vars.iconMed, () -> {
             int queued = basePlans.queueAll();

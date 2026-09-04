@@ -9,7 +9,9 @@ import mindustry.game.Schematic;
 import mindustry.game.Schematic.Stile;
 import mindustry.game.Team;
 import mindustry.game.Teams.BlockPlan;
+import mindustry.gen.Building;
 import mindustry.world.Tile;
+import mindustry.world.blocks.storage.CoreBlock.CoreBuild;
 
 /**
  * Your destroyed base, which the game still remembers.
@@ -42,12 +44,22 @@ public final class BasePlans {
     /**
      * Delete every building that stands where a plan wants to go, and return how many.
      *
-     * <p>Only buildings of other teams, derelict included: derelict is where a griefed
-     * base ends up once its team is wiped, and it blocks a rebuild exactly like an enemy
-     * wall does. Your own buildings are left alone; a plan under one of them is a plan
-     * you already rebuilt.
+     * <p>Buildings of other teams always go, derelict included: derelict is where a
+     * griefed base ends up once its team is wiped, and it blocks a rebuild exactly like
+     * an enemy wall does.
+     *
+     * <p>{@code includeOwn} adds your own buildings, which is what the sector loadout is:
+     * the starter base the game drops when you launch, sitting on ground your old base
+     * used to hold. Two things are never removed even then. A core, because losing the
+     * last one is an instant defeat rather than a cleanup. And privileged blocks, which
+     * belong to the map rather than to a player.
+     *
+     * <p>Removal goes through {@code setNet}, which takes the building out without a
+     * {@code BlockDestroyEvent}. That matters here: the event is what files a plan
+     * ({@code Logic} listens for it), so clearing does not quietly add every cleared
+     * block to the very list being rebuilt.
      */
-    public int clearBlockers() {
+    public int clearBlockers(boolean includeOwn) {
         Team mine = Vars.player.team();
         int cleared = 0;
 
@@ -58,7 +70,10 @@ public final class BasePlans {
             for (int dx = 0; dx < size; dx++) {
                 for (int dy = 0; dy < size; dy++) {
                     Tile tile = Vars.world.tile(plan.x + origin + dx, plan.y + origin + dy);
-                    if (tile != null && tile.build != null && tile.build.team != mine) {
+                    if (tile == null || tile.build == null) {
+                        continue;
+                    }
+                    if (removable(tile.build, mine, includeOwn)) {
                         tile.setNet(Blocks.air);
                         cleared++;
                     }
@@ -66,6 +81,16 @@ public final class BasePlans {
             }
         }
         return cleared;
+    }
+
+    private static boolean removable(Building building, Team mine, boolean includeOwn) {
+        if (building.block.privileged) {
+            return false;
+        }
+        if (building.team != mine) {
+            return true;
+        }
+        return includeOwn && !(building instanceof CoreBuild);
     }
 
     /** Queue every plan for rebuilding, which is holding B over the whole map at once. */
