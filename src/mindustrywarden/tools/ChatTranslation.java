@@ -4,6 +4,7 @@ import arc.Core;
 import arc.struct.ObjectIntMap;
 import arc.struct.ObjectSet;
 import arc.struct.Seq;
+import arc.scene.ui.TextField;
 import arc.util.Log;
 import mindustry.Vars;
 import mindustry.gen.Call;
@@ -37,6 +38,7 @@ public final class ChatTranslation {
 
     private static final String enabledSetting = "warden-chat-on";
     private static final String forcedSetting = "warden-chat-forced";
+    private static final String replaceSetting = "warden-chat-replace";
 
     /** How many recent lines decide what the room speaks. */
     private static final int memory = 20;
@@ -71,11 +73,16 @@ public final class ChatTranslation {
      */
     private String lastTranslated = "";
 
-    /** Called once per frame: reads what the chat has shown since last time. */
+    /** The chat's input box, borrowed once. */
+    private TextField chatfield;
+
+    /** Called once per frame: intercepts what is about to be sent, reads what arrived. */
     public void update() {
         if (!Vars.state.isGame()) {
             return;
         }
+
+        interceptOutgoing();
 
         watcher.poll((index, line) -> {
             // A line we already rewrote, whatever brought it back around. Without this
@@ -126,6 +133,79 @@ public final class ChatTranslation {
                 }
             }));
         });
+    }
+
+    /**
+     * Take a message out of the chat box before the game sends it, and send its
+     * translation instead.
+     *
+     * <p>Only possible because of the order of things. The game reads the box, empties
+     * it, and refuses to send an empty message, all inside its own update, which happens
+     * after this one. Emptying the box here therefore means the game sends nothing, and
+     * what goes out is whatever this sends in its place.
+     *
+     * <p>If the translation cannot be had, the original is sent unchanged. Swallowing a
+     * message and then failing would leave the player having said nothing at all.
+     */
+    private void interceptOutgoing() {
+        if (!enabled() || !replacing() || Vars.ui == null || !Vars.ui.chatfrag.shown()) {
+            return;
+        }
+        if (!Core.input.keyTap(mindustry.input.Binding.chat)) {
+            return;
+        }
+
+        TextField field = field();
+        if (field == null) {
+            return;
+        }
+
+        String text = field.getText().trim();
+        if (text.isEmpty() || text.startsWith("/")) {
+            return;
+        }
+
+        String room = roomLanguage();
+        if (room == null || room.equals(mine())) {
+            return;
+        }
+
+        String language = guess.of(text);
+        if (language != null && !language.equals(mine())) {
+            return;
+        }
+
+        field.setText("");
+        Log.info("[warden] holding back, @ -> @: @", mine(), room, text);
+
+        translator.translate(text, mine(), room,
+            translated -> Core.app.post(() -> {
+                Log.info("[warden] sending instead: @", translated);
+                lastSent = translated;
+                lastTranslated = translated;
+                Call.sendChatMessage(translated);
+            }),
+            () -> Core.app.post(() -> {
+                Log.info("[warden] no translation, sending the original");
+                lastTranslated = text;
+                Call.sendChatMessage(text);
+            }));
+    }
+
+    /** The chat's own input box, which is private and has to be borrowed. */
+    private TextField field() {
+        if (chatfield != null) {
+            return chatfield;
+        }
+        try {
+            java.lang.reflect.Field found =
+                Vars.ui.chatfrag.getClass().getDeclaredField("chatfield");
+            found.setAccessible(true);
+            chatfield = (TextField) found.get(Vars.ui.chatfrag);
+        } catch (Throwable denied) {
+            Log.info("[warden] chat box not reachable, messages will be sent as typed");
+        }
+        return chatfield;
     }
 
     /**
@@ -301,6 +381,15 @@ public final class ChatTranslation {
     /** Your language, which is the one the panel is already in. */
     public String mine() {
         return mindustrywarden.Lang.language();
+    }
+
+    /** Whether your message is replaced by its translation rather than followed by it. */
+    public boolean replacing() {
+        return Core.settings.getBool(replaceSetting, false);
+    }
+
+    public void replacing(boolean value) {
+        Core.settings.put(replaceSetting, value);
     }
 
     public boolean enabled() {

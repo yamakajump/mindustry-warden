@@ -729,6 +729,9 @@ public class WardenDialog extends BaseDialog {
             rebuild();
         }).left().tooltip(Lang.get("chat.on.hint")).padBottom(14f).row();
 
+        body.check(Lang.get("chat.replace"), chat.replacing(), chat::replacing)
+            .left().tooltip(Lang.get("chat.replace.hint")).padBottom(14f).row();
+
         body.add(Lang.get("chat.forced")).color(Pal.lightishGray).left().padBottom(4f).row();
 
         body.table(row -> {

@@ -189,6 +189,16 @@ public final class Lang {
             "@ des @ derniers messages sont en @");
         put("chat.state.unknown", "Not enough has been said yet to tell.",
             "Pas encore assez de messages pour le dire.");
+        put("chat.replace", "Send only the translation", "N'envoyer que la traduction");
+        put("chat.replace.hint",
+            "Your message is taken out of the chat box and replaced by its translation, "
+                + "so only the translated line is sent. Off, both go out: yours and the "
+                + "translation after it. If the translation fails, the original is sent "
+                + "unchanged either way.",
+            "Ton message est retiré de la barre de chat et remplacé par sa traduction, "
+                + "donc seule la ligne traduite part. Décoché, les deux partent : le tien "
+                + "puis la traduction. Si la traduction échoue, l'original part tel quel "
+                + "dans les deux cas.");
         put("chat.forced", "Force a language", "Forcer une langue");
         put("chat.auto", "Auto", "Auto");
         put("chat.forget", "Forget what was heard", "Oublier ce qui a été entendu");

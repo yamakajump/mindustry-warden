@@ -50,6 +50,18 @@ public final class Translator {
      * came, which is what would have happened without the mod.
      */
     public void translate(String text, String source, String target, Cons<String> done) {
+        translate(text, source, target, done, () -> { });
+    }
+
+    /**
+     * As above, with something to run when no translation could be had.
+     *
+     * <p>Needed by the caller that replaces a player's message with its translation: if
+     * the translation never arrives, the message has to be sent as it was rather than
+     * silently dropped.
+     */
+    public void translate(String text, String source, String target, Cons<String> done,
+        Runnable failed) {
         String encoded = URLEncoder.encode(text, StandardCharsets.UTF_8);
 
         Http.get(endpoint + target + "&q=" + encoded, response -> {
@@ -58,17 +70,17 @@ public final class Translator {
                 done.get(translated);
             } else {
                 Log.info("[warden] google gave nothing usable, trying the fallback");
-                fallback(encoded, source, target, text, done);
+                fallback(encoded, source, target, text, done, failed);
             }
         }, error -> {
             Log.info("[warden] google refused (@), trying the fallback", error.getMessage());
-            fallback(encoded, source, target, text, done);
+            fallback(encoded, source, target, text, done, failed);
         });
     }
 
     /** MyMemory, which answers plain JSON and does not mind being called by a program. */
     private void fallback(String encoded, String source, String target, String original,
-        Cons<String> done) {
+        Cons<String> done, Runnable failed) {
 
         String from = source == null || source.isEmpty() ? "en" : source;
         String url = "https://api.mymemory.translated.net/get?q=" + encoded
@@ -83,11 +95,16 @@ public final class Translator {
                 }
                 if (!usable(translated, original)) {
                     Log.info("[warden] fallback gave nothing usable: @", translated);
+                    failed.run();
                 }
             } catch (Throwable malformed) {
                 Log.info("[warden] unreadable fallback reply");
+                failed.run();
             }
-        }, error -> Log.info("[warden] both services failed: @", error.getMessage()));
+        }, error -> {
+            Log.info("[warden] both services failed: @", error.getMessage());
+            failed.run();
+        });
     }
 
     /** A translation worth showing: present, and not the line we already have. */
